@@ -1,16 +1,131 @@
-# React + Vite
+# Sistema de Ventas Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema completo de ventas con gestión de inventario, control de stock automático y reportes de ventas. Incluye autenticación básica y configuración segura mediante variables de entorno.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Características
 
-## React Compiler
+- Registro de ventas
+- Control de inventario en tiempo real
+- Descuento automático de stock por venta
+- Reporte de ventas
+- Configuración segura con variables `.env`
+- API rápida con Node.js + Express
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Tecnologías usadas
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+**Frontend**
+
+- React
+- Tailwind CSS
+
+**Backend**
+
+- Node.js
+- Express
+- JavaScript
+- dotenv (variables de entorno)
+- Base de datos (MongoDB / MySQL / etc.)
+
+---
+
+## Instalación
+
+1. Clona el repositorio:
+
+```bash
+git clone https://github.com/tuusuario/tu-repo.git
+```
+
+2. Entra al proyecto:
+
+```bash
+cd tu-repo
+```
+
+3. Instala dependencias:
+
+```bash
+npm install
+```
+
+4. Crea tu archivo `.env`:
+
+```env
+PORT=3000
+DB_URL=tu_conexion_aqui
+```
+
+5. Inicia el servidor:
+
+```bash
+npm run dev
+```
+
+---
+
+## Endpoints principales
+
+### Ventas
+
+| Método | Ruta     | Descripción                   |
+|--------|----------|-------------------------------|
+| `POST` | `/ventas` | Registrar una venta          |
+| `GET`  | `/ventas` | Obtener historial de ventas  |
+
+### Productos / Inventario
+
+| Método | Ruta                    | Descripción        |
+|--------|-------------------------|--------------------|
+| `GET`  | `/productos`            | Ver inventario     |
+| `PUT`  | `/productos/:id`        | Actualizar producto|
+| `PUT`  | `/productos/:id/stock`  | Agregar stock      |
+
+---
+
+## Seguridad
+
+Este proyecto utiliza variables de entorno (`.env`) para proteger información sensible como:
+
+- Claves de base de datos
+- Puerto del servidor
+- Configuraciones privadas
+
+> **Advertencia:** El archivo `.env` NO debe subirse a GitHub.
+
+---
+
+## Flujo del sistema
+
+1. Se registra una venta
+2. El sistema valida el stock
+3. Se descuenta automáticamente el inventario
+4. Se guarda el historial en ventas
+5. Se genera reporte de ventas
+
+---
+
+## Futuras mejoras
+
+- Generación de facturas PDF
+- Sistema de usuarios con roles (admin / empleado)
+- Interfaz frontend más avanzada
+- Alertas de stock bajo
+- Deploy en la nube
+
+---
+
+## Autor
+
+Desarrollado por **Gabriel Aedo**
+
+Proyecto personal de aprendizaje y desarrollo full stack.
+
+---
+
+## Licencia
+
+Este proyecto es de uso educativo y personal.
