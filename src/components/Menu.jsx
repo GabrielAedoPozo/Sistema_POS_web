@@ -1,5 +1,6 @@
 function Menu({ onNewSale, activeSection, onSectionChange }) {
   const salesActive = activeSection === 'ventas'
+  const inventoryActive = activeSection === 'inventario'
   const reportsActive = activeSection === 'reportes'
 
   return (
@@ -19,7 +20,12 @@ function Menu({ onNewSale, activeSection, onSectionChange }) {
           <i className="fa-solid fa-cash-register"></i>
           Ventas
         </button>
-        <button className="h-11 rounded-xl px-4 flex items-center gap-3 text-slate-700 hover:bg-slate-200 transition-colors duration-150">
+        <button
+          className={`h-11 rounded-xl px-4 flex items-center gap-3 transition-colors duration-150 ${
+            inventoryActive ? 'bg-blue-100 text-blue-800 font-semibold' : 'text-slate-700 hover:bg-slate-200'
+          }`}
+          onClick={() => onSectionChange('inventario')}
+        >
           <i className="fa-solid fa-box"></i>
           Inventario
         </button>
