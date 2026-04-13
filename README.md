@@ -32,35 +32,6 @@ Sistema completo de punto de venta con gestión de inventario, control de stock 
 
 ---
 
-## Arquitectura del sistema
-┌─────────────────────────────────────────────┐
-│                  FRONTEND                   │
-│           React + Tailwind CSS              │
-│   (Ventas, Inventario, Reportes, Config)    │
-└─────────────────┬───────────────────────────┘
-│ HTTP / REST
-┌─────────────────▼───────────────────────────┐
-│                  BACKEND                    │
-│            Node.js + Express                │
-│                                             │
-│  ┌─────────────┐   ┌─────────────────────┐  │
-│  │  Módulo de  │   │  Módulo de          │  │
-│  │   Ventas    │   │   Inventario        │  │
-│  └─────────────┘   └─────────────────────┘  │
-│  ┌─────────────────────────────────────┐    │
-│  │     Módulo SUNAT (API REST)         │    │
-│  │  Emisión de boletas y facturas      │    │
-│  └─────────────────────────────────────┘    │
-└──────────┬──────────────────┬───────────────┘
-│                  │
-┌──────────▼──────┐  ┌────────▼────────────────┐
-│   Base de Datos │  │     API SUNAT           │
-│  MongoDB / MySQL│  │  (Ambiente Beta /       │
-│                 │  │   Producción)           │
-└─────────────────┘  └─────────────────────────┘
-
----
-
 ## Integración con SUNAT
 
 Este sistema está conectado con la **API REST de SUNAT** para la emisión electrónica de comprobantes de pago, cumpliendo con la normativa tributaria peruana.
