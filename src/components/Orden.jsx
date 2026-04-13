@@ -4,7 +4,11 @@ function Orden({
     tax,
     total,
     paymentMethod,
+    customerDocument,
+    customerName,
     onPaymentSelect,
+    onCustomerDocumentChange,
+    onCustomerNameChange,
     onUpdateQty,
     onClearOrder,
     onCheckout,
@@ -50,7 +54,7 @@ function Orden({
             <div className="mt-auto bg-white rounded-xl p-4 border border-slate-200 shrink-0">
                 <div className="space-y-1 text-sm text-slate-600 mb-3">
                     <div className="flex justify-between"><span>Subtotal</span><span>{formatMoney(subtotal)}</span></div>
-                    <div className="flex justify-between"><span>Sales Tax (8%)</span><span>{formatMoney(tax)}</span></div>
+                    <div className="flex justify-between"><span>IGV (18%)</span><span>{formatMoney(tax)}</span></div>
                 </div>
 
                 <div className="flex items-end justify-between mb-4">
@@ -75,10 +79,27 @@ function Orden({
                     ))}
                 </div>
 
+                <div className="space-y-2 mb-3">
+                    <input
+                        className="w-full h-11 rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
+                        placeholder="Documento cliente (DNI o RUC)"
+                        value={customerDocument}
+                        onChange={(event) => onCustomerDocumentChange(event.target.value)}
+                        disabled={disabled}
+                    />
+                    <input
+                        className="w-full h-11 rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
+                        placeholder="Nombre / Razón social"
+                        value={customerName}
+                        onChange={(event) => onCustomerNameChange(event.target.value)}
+                        disabled={disabled}
+                    />
+                </div>
+
                 <button
                     className="w-full h-12 rounded-xl bg-blue-800 text-white font-semibold hover:bg-blue-900 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={onCheckout}
-                    disabled={disabled || orderItems.length === 0 || !paymentMethod}
+                    disabled={disabled || orderItems.length === 0 || !paymentMethod || !customerDocument.trim() || !customerName.trim()}
                 >
                     <i className="fa-solid fa-receipt mr-2"></i>
                     Imprimir Boleta / Cobrar

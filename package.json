@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "concurrently -k \"npm run backend:dev\" \"npm run dev\"",
+    "backend:start": "npm --prefix backend run start",
+    "backend:dev": "npm --prefix backend run dev",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -12,6 +15,9 @@
   "dependencies": {
     "@fontsource/onest": "^5.2.11",
     "@tailwindcss/vite": "^4.2.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "concurrently": "^9.2.1",
     "mysql2": "^3.22.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -22,6 +28,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",

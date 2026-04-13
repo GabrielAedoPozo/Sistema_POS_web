@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+import fs from "fs";
 import pool from "./db.js";
+import { emitirBoleta, emitirFactura } from "./apisunat.js";
 
 const app = express();
 const PORT = 3000;
@@ -29,10 +31,93 @@ const sembrarProductosIniciales = async () => {
 	}
 };
 
+const crearTablaComprobantes = async () => {
+	await pool.query(
+		`CREATE TABLE IF NOT EXISTS comprobantes (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			venta_id INT NOT NULL,
+			tipo_documento VARCHAR(20) NOT NULL,
+			serie VARCHAR(10) NOT NULL,
+			numero VARCHAR(20) NOT NULL,
+			cliente_tipo_documento CHAR(1) NOT NULL,
+			cliente_numero_documento VARCHAR(20) NOT NULL,
+			cliente_denominacion VARCHAR(255) NOT NULL,
+			xml LONGTEXT NULL,
+			pdf LONGTEXT NULL,
+			cdr LONGTEXT NULL,
+			hash VARCHAR(255) NULL,
+			respuesta_json JSON NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE KEY uq_comprobante_venta (venta_id),
+			CONSTRAINT fk_comprobante_venta FOREIGN KEY (venta_id) REFERENCES ventas(id)
+		)`
+	);
+};
+
+const redondear2 = (valor) => Number(Number(valor).toFixed(2));
+
+const construirItemsSunat = (items = []) => {
+	let totalGravada = 0;
+	let totalIgv = 0;
+
+	const itemsSunat = items.map((item) => {
+		const cantidad = Number(item.cantidad);
+		const precioUnitario = Number(item.precio_unitario);
+		const valorUnitario = redondear2(precioUnitario / 1.18);
+
+		totalGravada += redondear2(valorUnitario * cantidad);
+		totalIgv += redondear2(valorUnitario * cantidad * 0.18);
+
+		return {
+			descripcion: item.descripcion,
+			cantidad,
+			valor_unitario: valorUnitario,
+			precio_unitario: redondear2(precioUnitario),
+			porcentaje_igv: 18,
+			codigo_tipo_afectacion_igv: "10",
+		};
+	});
+
+	const total = redondear2(totalGravada + totalIgv);
+
+	return {
+		itemsSunat,
+		totalGravada: redondear2(totalGravada),
+		totalIgv: redondear2(totalIgv),
+		total,
+	};
+};
+
+const obtenerValorComprobante = (respuesta, claves = []) => {
+	for (const clave of claves) {
+		if (respuesta?.[clave] !== undefined && respuesta?.[clave] !== null) {
+			return respuesta[clave];
+		}
+
+		if (respuesta?.data?.[clave] !== undefined && respuesta?.data?.[clave] !== null) {
+			return respuesta.data[clave];
+		}
+	}
+
+	return null;
+};
+
 app.use(cors());
 app.use(express.json());
 
-app.get("/productos", async (req, res) => {
+app.use((req, res, next) => {
+	if (req.url.startsWith("/api/comprobante")) {
+		return next();
+	}
+
+	if (req.url.startsWith("/api/")) {
+		req.url = req.url.replace(/^\/api/, "");
+	}
+
+	return next();
+});
+
+app.get(["/productos", "/api/productos"], async (req, res) => {
 	try {
 		const [rows] = await pool.query("SELECT * FROM productos");
 		return res.status(200).json(rows);
@@ -42,7 +127,7 @@ app.get("/productos", async (req, res) => {
 	}
 });
 
-app.post("/productos", async (req, res) => {
+app.post(["/productos", "/api/productos"], async (req, res) => {
 	try {
 		const { nombre, precio, stock } = req.body;
 
@@ -67,7 +152,7 @@ app.post("/productos", async (req, res) => {
 	}
 });
 
-app.put("/productos/:id", async (req, res) => {
+app.put(["/productos/:id", "/api/productos/:id"], async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { nombre, precio, stock } = req.body;
@@ -94,7 +179,7 @@ app.put("/productos/:id", async (req, res) => {
 	}
 });
 
-app.delete("/productos/:id", async (req, res) => {
+app.delete(["/productos/:id", "/api/productos/:id"], async (req, res) => {
 	try {
 		const { id } = req.params;
 
@@ -111,7 +196,7 @@ app.delete("/productos/:id", async (req, res) => {
 	}
 });
 
-app.get("/ventas", async (req, res) => {
+app.get(["/ventas", "/api/ventas"], async (req, res) => {
 	try {
 		const [rows] = await pool.query(
 			`SELECT
@@ -157,7 +242,7 @@ app.get("/ventas", async (req, res) => {
 	}
 });
 
-app.post("/ventas", async (req, res) => {
+app.post(["/ventas", "/api/ventas"], async (req, res) => {
 	let connection;
 
 	try {
@@ -255,8 +340,172 @@ app.post("/ventas", async (req, res) => {
 	}
 });
 
+const logToFile = (msg) => {
+	fs.appendFileSync(
+		"./debug.log",
+		`${new Date().toISOString()} - ${msg}\n`
+	);
+};
+
+app.post("/api/comprobante", async (req, res) => {
+	try {
+		logToFile("=== POST /api/comprobante INICIADO ===");
+		logToFile("Body: " + JSON.stringify(req.body));
+		const {
+			venta_id,
+			fecha_de_emision,
+			cliente_numero_de_documento,
+			cliente_denominacion,
+			items,
+		} = req.body;
+
+		if (!venta_id || !fecha_de_emision || !cliente_numero_de_documento || !cliente_denominacion) {
+			return res.status(400).json({
+				error: "venta_id, fecha_de_emision, cliente_numero_de_documento y cliente_denominacion son obligatorios",
+			});
+		}
+
+		if (!Array.isArray(items) || items.length === 0) {
+			return res.status(400).json({
+				error: "Debe enviar items para emitir el comprobante",
+			});
+		}
+
+		const numeroDocumento = String(cliente_numero_de_documento).trim();
+		const tipoDocumentoCliente = numeroDocumento.length === 11 ? "6" : "1";
+
+		if (![8, 11].includes(numeroDocumento.length)) {
+			return res.status(400).json({
+				error: "El documento del cliente debe tener 8 (DNI) o 11 (RUC) dígitos",
+			});
+		}
+
+		const documento = tipoDocumentoCliente === "6" ? "factura" : "boleta";
+		const serie = documento === "factura" ? "F001" : "B001";
+		const numero = String(venta_id).padStart(8, "0");
+
+		for (const item of items) {
+			if (!item.descripcion || !item.cantidad || item.precio_unitario === undefined) {
+				return res.status(400).json({
+					error: "Cada item debe incluir descripcion, cantidad y precio_unitario",
+				});
+			}
+		}
+
+		const { itemsSunat, totalGravada, totalIgv, total } = construirItemsSunat(items);
+
+		logToFile("itemsSunat construidos: " + JSON.stringify(itemsSunat));
+
+		const payloadSunat = {
+			serie,
+			numero,
+			fecha_de_emision,
+			cliente_tipo_de_documento: tipoDocumentoCliente,
+			cliente_numero_de_documento: numeroDocumento,
+			cliente_denominacion,
+			items: itemsSunat,
+			total_gravada: totalGravada,
+			total_igv: totalIgv,
+			total,
+		};
+
+		logToFile("payloadSunat construido, llamando emitir" + documento + "...");
+
+		const respuestaSunat =
+			documento === "factura"
+				? await emitirFactura(payloadSunat)
+				: await emitirBoleta(payloadSunat);
+
+		if (respuestaSunat?.success !== true) {
+			return res.status(400).json({
+				error:
+					respuestaSunat?.message ||
+					"APISUNAT no confirmó la emisión del comprobante",
+				respuesta: respuestaSunat,
+			});
+		}
+
+		const xml = obtenerValorComprobante(respuestaSunat, ["xml", "xml_url", "enlace_xml"]);
+		const pdf = obtenerValorComprobante(respuestaSunat, ["pdf", "pdf_url", "enlace_pdf"]);
+		const cdr = obtenerValorComprobante(respuestaSunat, ["cdr", "cdr_url", "enlace_cdr"]);
+		const hash = obtenerValorComprobante(respuestaSunat, ["hash", "digest_value", "codigo_hash"]);
+		const documentId = obtenerValorComprobante(respuestaSunat, ["documentId"]);
+		const estado = obtenerValorComprobante(respuestaSunat, ["status"]);
+		const fileName = obtenerValorComprobante(respuestaSunat, ["fileName"]);
+
+		await pool.query(
+			`INSERT INTO comprobantes (
+				venta_id,
+				tipo_documento,
+				serie,
+				numero,
+				cliente_tipo_documento,
+				cliente_numero_documento,
+				cliente_denominacion,
+				xml,
+				pdf,
+				cdr,
+				hash,
+				respuesta_json
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE
+				tipo_documento = VALUES(tipo_documento),
+				serie = VALUES(serie),
+				numero = VALUES(numero),
+				cliente_tipo_documento = VALUES(cliente_tipo_documento),
+				cliente_numero_documento = VALUES(cliente_numero_documento),
+				cliente_denominacion = VALUES(cliente_denominacion),
+				xml = VALUES(xml),
+				pdf = VALUES(pdf),
+				cdr = VALUES(cdr),
+				hash = VALUES(hash),
+				respuesta_json = VALUES(respuesta_json)`,
+			[
+				venta_id,
+				documento,
+				serie,
+				numero,
+				tipoDocumentoCliente,
+				numeroDocumento,
+				cliente_denominacion,
+				xml,
+				pdf,
+				cdr,
+				hash,
+				JSON.stringify(respuestaSunat),
+			]
+		);
+
+		return res.status(201).json({
+			message: `${documento} enviada a APISUNAT (${estado || "PENDIENTE"})`,
+			documento,
+			serie,
+			numero,
+			documentId,
+			estado,
+			fileName,
+			hash,
+			pdf,
+			xml,
+			cdr,
+		});
+	} catch (error) {
+		logToFile("ERROR: " + error.message);
+		logToFile("STACK: " + error.stack);
+		console.error("Error al emitir comprobante:", error.message);
+		return res.status(500).json({ error: error.message || "Error al emitir comprobante" });
+	}
+});
+
+app.get("/api/comprobante", (req, res) => {
+	return res.status(405).json({
+		error: "Usa POST /api/comprobante para emitir un comprobante electrónico",
+	});
+});
+
 const iniciarServidor = async () => {
 	try {
+		await crearTablaComprobantes();
 		await sembrarProductosIniciales();
 		app.listen(PORT, () => {
 			console.log(`Servidor backend corriendo en http://localhost:${PORT}`);

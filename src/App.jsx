@@ -10,7 +10,63 @@ import '@fontsource/onest/400.css';
 import '@fontsource/onest/500.css';
 import '@fontsource/onest/600.css';
 
-const API_URL = 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+const API_BASES = [API_URL, '', 'http://localhost:3000', 'http://127.0.0.1:3000']
+
+const normalizarBase = (base) => {
+  if (!base) return ''
+  return base.endsWith('/') ? base.slice(0, -1) : base
+}
+
+const construirUrl = (base, path) => {
+  const baseNormalizada = normalizarBase(base)
+  if (!baseNormalizada) return path
+  return `${baseNormalizada}${path}`
+}
+
+const esRespuestaJson = (response) => {
+  const contentType = response.headers.get('content-type') || ''
+  return contentType.toLowerCase().includes('application/json')
+}
+
+const normalizarMensajeError = (error, fallback) => {
+  const msg = String(error?.message || '').toLowerCase()
+
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+    return 'No hay conexion con el backend. Inicia el servidor y vuelve a intentar.'
+  }
+
+  return error?.message || fallback
+}
+
+const fetchConFallback = async (paths, options) => {
+  let ultimoError = null
+
+  for (const base of API_BASES) {
+    for (const path of paths) {
+      const url = construirUrl(base, path)
+
+      try {
+        const response = await fetch(url, options)
+
+        if (response.status === 404) {
+          continue
+        }
+
+        if (!esRespuestaJson(response)) {
+          continue
+        }
+
+        return response
+      } catch (error) {
+        ultimoError = error
+      }
+    }
+  }
+
+  throw ultimoError || new Error('No se pudo obtener una respuesta JSON del backend')
+}
 
 
 function App() {
@@ -19,8 +75,11 @@ function App() {
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [productsError, setProductsError] = useState('')
   const [saleError, setSaleError] = useState('')
+  const [comprobanteMessage, setComprobanteMessage] = useState({ type: '', text: '' })
   const [orderItems, setOrderItems] = useState([])
   const [paymentMethod, setPaymentMethod] = useState('')
+  const [customerDocument, setCustomerDocument] = useState('')
+  const [customerName, setCustomerName] = useState('')
   const [activeSection, setActiveSection] = useState('ventas')
   const [salesHistory, setSalesHistory] = useState([])
 
@@ -29,7 +88,7 @@ function App() {
     setProductsError('')
 
     try {
-      const response = await fetch(`${API_URL}/productos`)
+      const response = await fetchConFallback(['/api/productos', '/productos'])
       if (!response.ok) {
         throw new Error('No se pudo obtener productos')
       }
@@ -37,7 +96,7 @@ function App() {
       const data = await response.json()
       setProducts(data)
     } catch (error) {
-      setProductsError(error.message || 'Error cargando inventario')
+      setProductsError(normalizarMensajeError(error, 'Error cargando inventario'))
     } finally {
       setLoadingProducts(false)
     }
@@ -45,7 +104,7 @@ function App() {
 
   const fetchSalesHistory = async () => {
     try {
-      const response = await fetch(`${API_URL}/ventas`)
+      const response = await fetchConFallback(['/api/ventas', '/ventas'])
 
       if (!response.ok) {
         throw new Error('No se pudo obtener el historial de ventas')
@@ -54,12 +113,15 @@ function App() {
       const data = await response.json()
       setSalesHistory(data)
     } catch (error) {
-      setSaleError(error.message || 'Error cargando reportes')
+      setSaleError(normalizarMensajeError(error, 'Error cargando reportes'))
     }
   }
 
   const updateProductStock = async (product, nextStock) => {
-    const response = await fetch(`${API_URL}/productos/${product.id}`, {
+    const response = await fetchConFallback([
+      `/api/productos/${product.id}`,
+      `/productos/${product.id}`,
+    ], {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -93,7 +155,7 @@ function App() {
   }, [products, search])
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.qty, 0)
-  const tax = subtotal * 0.08
+  const tax = subtotal * 0.18
   const total = subtotal + tax
 
   const addProductToOrder = (product) => {
@@ -148,22 +210,90 @@ function App() {
 
   const clearOrder = () => {
     setOrderItems([])
+    setCustomerDocument('')
+    setCustomerName('')
   }
 
   const handleNewSale = () => {
     setOrderItems([])
     setPaymentMethod('')
+    setCustomerDocument('')
+    setCustomerName('')
+    setComprobanteMessage({ type: '', text: '' })
     setSearch('')
     setActiveSection('ventas')
   }
+
+  const descargarPdfDesdeBase64 = (base64, fileName) => {
+    const limpio = base64.includes(',') ? base64.split(',')[1] : base64
+    const bytes = atob(limpio)
+    const array = new Uint8Array(bytes.length)
+
+    for (let i = 0; i < bytes.length; i += 1) {
+      array[i] = bytes.charCodeAt(i)
+    }
+
+    const blob = new Blob([array], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const descargarPdfApisunat = async (pdfValue, fileName) => {
+    if (!pdfValue) {
+      throw new Error('APISUNAT no devolvió el PDF de la boleta')
+    }
+
+    if (typeof pdfValue !== 'string') {
+      throw new Error('Formato de PDF inválido recibido desde APISUNAT')
+    }
+
+    if (pdfValue.startsWith('http://') || pdfValue.startsWith('https://')) {
+      const response = await fetch(pdfValue)
+      if (!response.ok) {
+        throw new Error('No se pudo descargar el PDF desde APISUNAT')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      return
+    }
+
+    descargarPdfDesdeBase64(pdfValue, fileName)
+  }
+
 
   const handleCheckout = () => {
     if (orderItems.length === 0 || !paymentMethod) return
 
     const sendSale = async () => {
       setSaleError('')
+      setComprobanteMessage({ type: '', text: '' })
 
       try {
+        const trimmedDocument = customerDocument.trim()
+        const trimmedName = customerName.trim()
+
+        if (![8, 11].includes(trimmedDocument.length)) {
+          throw new Error('El documento del cliente debe tener 8 dígitos (DNI) o 11 dígitos (RUC)')
+        }
+
+        if (!trimmedName) {
+          throw new Error('Debes ingresar nombre o razón social del cliente')
+        }
+
         const payload = {
           total,
           metodo_pago: paymentMethod,
@@ -174,7 +304,7 @@ function App() {
           }))
         }
 
-        const response = await fetch(`${API_URL}/ventas`, {
+        const response = await fetchConFallback(['/api/ventas', '/ventas'], {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -202,12 +332,53 @@ function App() {
         }
 
         setSalesHistory((prev) => [sale, ...prev])
+        setProducts(Array.isArray(data.productos) ? data.productos : [])
+
+        const comprobantePayload = {
+          venta_id: data.ventaId,
+          fecha_de_emision: new Date().toISOString().slice(0, 10),
+          cliente_numero_de_documento: trimmedDocument,
+          cliente_denominacion: trimmedName,
+          items: orderItems.map((item) => ({
+            descripcion: item.name,
+            cantidad: item.qty,
+            precio_unitario: item.price,
+          })),
+        }
+
+        const comprobanteResponse = await fetch(construirUrl(API_URL, '/api/comprobante'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(comprobantePayload),
+        })
+
+        const comprobanteData = await comprobanteResponse.json()
+
+        if (!comprobanteResponse.ok) {
+          const errorText = comprobanteData.error || 'La venta se registró, pero falló la emisión del comprobante'
+
+          throw new Error(errorText)
+        }
+
+        const nombreArchivo = `${comprobanteData.documento || 'comprobante'}-${comprobanteData.serie || 'DOC'}-${comprobanteData.numero || data.ventaId}.pdf`
+        await descargarPdfApisunat(comprobanteData.pdf, nombreArchivo)
+
+        setComprobanteMessage({
+          type: 'success',
+          text: comprobanteData.message || 'Comprobante emitido y PDF descargado correctamente',
+        })
+
         setOrderItems([])
         setPaymentMethod('')
-        setProducts(Array.isArray(data.productos) ? data.productos : [])
+        setCustomerDocument('')
+        setCustomerName('')
         await fetchSalesHistory()
       } catch (error) {
-        setSaleError(error.message || 'Error al cobrar la venta')
+        setComprobanteMessage({
+          type: 'error',
+          text: normalizarMensajeError(error, 'Error al emitir comprobante en APISUNAT'),
+        })
+        setSaleError(normalizarMensajeError(error, 'Error al cobrar la venta'))
       }
     }
 
@@ -244,6 +415,18 @@ function App() {
             {saleError && (
               <div className='mb-3 bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3'>
                 {saleError}
+              </div>
+            )}
+
+            {comprobanteMessage.text && (
+              <div
+                className={`mb-3 rounded-xl px-4 py-3 border ${
+                  comprobanteMessage.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+              >
+                {comprobanteMessage.text}
               </div>
             )}
 
@@ -316,7 +499,11 @@ function App() {
         tax={tax}
         total={total}
         paymentMethod={paymentMethod}
+        customerDocument={customerDocument}
+        customerName={customerName}
         onPaymentSelect={setPaymentMethod}
+        onCustomerDocumentChange={setCustomerDocument}
+        onCustomerNameChange={setCustomerName}
         onUpdateQty={updateQty}
         onClearOrder={clearOrder}
         onCheckout={handleCheckout}
