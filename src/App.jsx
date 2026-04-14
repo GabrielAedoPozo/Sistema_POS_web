@@ -436,12 +436,13 @@ function App() {
               </div>
             )}
 
-            <div className='bg-white border border-slate-300 rounded-xl overflow-hidden'>
-              <div className='grid grid-cols-[1fr_110px] px-5 py-2 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide'>
+            <div className='bg-white border border-slate-300 rounded-xl overflow-hidden flex flex-col flex-1 min-h-0'>
+              <div className='grid grid-cols-[1fr_110px] px-5 py-2 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
                 <p>PRODUCT NAME</p>
                 <p>PRICE</p>
               </div>
 
+              <div className='overflow-y-auto flex-1'>
               {filteredProducts.map((product, index) => (
                 <div
                   key={product.id}
@@ -478,6 +479,7 @@ function App() {
                   Cargando productos...
                 </div>
               )}
+              </div>
             </div>
           </>
         ) : activeSection === 'inventario' ? (

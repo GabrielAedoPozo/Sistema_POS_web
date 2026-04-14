@@ -42,12 +42,7 @@ function Inventario({ products, loading, error, onRefresh, onUpdateStock }) {
   return (
     <section className='h-full flex flex-col gap-4 overflow-hidden'>
       <header className='shrink-0 flex items-center justify-between'>
-        <div>
-          <h1 className='text-3xl font-semibold text-slate-900'>Inventario</h1>
-          <p className='text-sm text-slate-600'>
-            Stock actualizado en tiempo real despues de cada venta.
-          </p>
-        </div>
+
 
         <button
           className='h-10 px-4 rounded-xl bg-blue-800 text-white font-semibold hover:bg-blue-900 transition-colors duration-150 disabled:opacity-60'
@@ -64,14 +59,15 @@ function Inventario({ products, loading, error, onRefresh, onUpdateStock }) {
         </div>
       )}
 
-      <div className='bg-white rounded-xl border border-slate-300 overflow-hidden'>
-        <div className='grid grid-cols-[80px_1fr_120px_150px] px-5 py-3 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide'>
+      <div className='bg-white rounded-xl border border-slate-300 overflow-hidden flex flex-col flex-1 min-h-0'>
+        <div className='grid grid-cols-[80px_1fr_120px_150px] px-5 py-3 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
           <p>ID</p>
           <p>PRODUCTO</p>
           <p>PRECIO</p>
           <p>STOCK</p>
         </div>
 
+        <div className='overflow-y-auto flex-1'>
         {products.map((product) => (
           <div
             key={product.id}
@@ -104,6 +100,7 @@ function Inventario({ products, loading, error, onRefresh, onUpdateStock }) {
             No hay productos para mostrar.
           </div>
         )}
+        </div>
       </div>
     </section>
   )

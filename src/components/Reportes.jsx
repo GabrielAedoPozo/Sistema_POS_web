@@ -21,12 +21,6 @@ function Reportes({ salesHistory }) {
 
   return (
     <section className='h-full flex flex-col gap-4 overflow-hidden'>
-      <header className='shrink-0'>
-        <h1 className='text-3xl font-semibold text-slate-900'>Reportes de Ventas</h1>
-        <p className='text-sm text-slate-600'>
-          Historial de ventas con total cobrado y resumen por metodo de pago.
-        </p>
-      </header>
 
       <div className='grid grid-cols-2 gap-4 shrink-0'>
         <div className='bg-white rounded-xl border border-slate-300 p-4'>
