@@ -4,6 +4,7 @@ import Menu from './components/Menu.jsx'
 import Orden from './components/Orden.jsx'
 import Reportes from './components/Reportes.jsx'
 import Inventario from './components/Inventario.jsx'
+import Dashboard from './components/Dashboard.jsx'
 import './styles/style.css'
 import '@fontsource/onest/300.css';
 import '@fontsource/onest/400.css';
@@ -490,6 +491,8 @@ function App() {
             onRefresh={fetchProducts}
             onUpdateStock={updateProductStock}
           />
+        ) : activeSection === 'dashboard' ? (
+          <Dashboard products={products} salesHistory={salesHistory} />
         ) : (
           <Reportes salesHistory={salesHistory} />
         )}
