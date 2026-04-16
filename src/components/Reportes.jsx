@@ -246,3 +246,4 @@ function Reportes({ salesHistory }) {
 }
 
 export default Reportes
+

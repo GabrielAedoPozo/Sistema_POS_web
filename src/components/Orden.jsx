@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react'
+
 function Orden({
     orderItems,
     subtotal,
@@ -16,6 +18,50 @@ function Orden({
 }){
     const paymentMethods = ['EFECTIVO', 'TARJETA', 'YAPE', 'PLIN']
     const formatMoney = (amount) => `$${amount.toFixed(2)}`
+    const timeoutRef = useRef(null)
+    const [searching, setSearching] = useState(false)
+
+    // Consultar nombre automáticamente cuando se complete el RUC (11 dígitos)
+    useEffect(() => {
+        // Limpiar el timeout anterior si existe
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+        }
+
+        // Solo buscar RUC (11 dígitos) o DNI (8 dígitos) si solo contiene números
+        if (customerDocument && /^\d+$/.test(customerDocument)) {
+            if (customerDocument.length === 11 || customerDocument.length === 8) {
+                // Búsqueda inmediata (sin esperar)
+                setSearching(true)
+                
+                const buscarCliente = async () => {
+                    try {
+                        const response = await fetch(`/api/consultar-cliente?documento=${customerDocument}`)
+                        const data = await response.json()
+
+                        console.log('Respuesta del servidor:', data)
+
+                        if (data.found && data.denominacion) {
+                            onCustomerNameChange(data.denominacion)
+                        }
+                        setSearching(false)
+                    } catch (error) {
+                        console.error('Error consultando cliente:', error)
+                        setSearching(false)
+                    }
+                }
+
+                // Pequeño delay para evitar request múltiples mientras se escribe
+                timeoutRef.current = setTimeout(buscarCliente, 300)
+            }
+        }
+
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current)
+            }
+        }
+    }, [customerDocument, onCustomerNameChange])
 
     return(
         <aside className="w-100 h-screen bg-slate-100 p-4 flex flex-col overflow-hidden">
@@ -80,16 +126,23 @@ function Orden({
                 </div>
 
                 <div className="space-y-2 mb-3">
+                    <div className="relative">
+                        <input
+                            className="w-full h-11 rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
+                            placeholder="RUC o DNI del cliente"
+                            value={customerDocument}
+                            onChange={(event) => onCustomerDocumentChange(event.target.value)}
+                            disabled={disabled}
+                        />
+                        {searching && (
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <i className="fa-solid fa-spinner animate-spin text-blue-500"></i>
+                            </div>
+                        )}
+                    </div>
                     <input
                         className="w-full h-11 rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
-                        placeholder="Documento cliente (DNI o RUC)"
-                        value={customerDocument}
-                        onChange={(event) => onCustomerDocumentChange(event.target.value)}
-                        disabled={disabled}
-                    />
-                    <input
-                        className="w-full h-11 rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
-                        placeholder="Nombre / Razón social"
+                        placeholder="Nombre / Razón social (se llena automáticamente)"
                         value={customerName}
                         onChange={(event) => onCustomerNameChange(event.target.value)}
                         disabled={disabled}

@@ -7,8 +7,7 @@ function Menu({ onNewSale, activeSection, onSectionChange }) {
   return (
     <aside className="w-[350px] h-screen border-r border-slate-300 bg-slate-100 px-4 py-5 flex flex-col overflow-hidden">
         <div className=" shrink-0">
-          <h2 className="font-bold text-3xl text-slate-800">SISTEMA POS</h2>
-          <p className="text-2xl tracking-[0.2em] text-slate-500">TERMINAL #01</p>
+          <img src="/img/gap-logo-oficial.png" className="h-40" alt="" />
         </div>
       
       <div className="flex flex-col gap-2 text-sm shrink-0 mt-10 gap-4">

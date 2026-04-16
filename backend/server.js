@@ -102,8 +102,43 @@ const obtenerValorComprobante = (respuesta, claves = []) => {
 	return null;
 };
 
+const logToFile = (msg) => {
+	fs.appendFileSync(
+		"./debug.log",
+		`${new Date().toISOString()} - ${msg}\n`
+	);
+};
+
 app.use(cors());
 app.use(express.json());
+
+// ✅ Debug endpoint — ANTES del middleware que reescribe URLs
+app.get("/api/debug-ruc/:numero", async (req, res) => {
+	const numero = req.params.numero;
+	const token = process.env.APISUNAT_TOKEN;
+	const personaId = process.env.APISUNAT_PERSONA_ID;
+
+	const urls = [
+		`https://back.apisunat.com/personas/v1/getRUC?personaId=${personaId}&personaToken=${token}&ruc=${numero}`,
+		`https://back.apisunat.com/personas/v1/getDNI?personaId=${personaId}&personaToken=${token}&dni=${numero}`,
+	];
+
+	const resultados = [];
+
+	for (const url of urls) {
+		try {
+			const response = await fetch(url);
+			const text = await response.text();
+			let json = null;
+			try { json = JSON.parse(text); } catch {}
+			resultados.push({ url, status: response.status, body: json || text });
+		} catch (err) {
+			resultados.push({ url, error: err.message });
+		}
+	}
+
+	return res.json(resultados);
+});
 
 app.use((req, res, next) => {
 	if (req.url.startsWith("/api/comprobante")) {
@@ -340,13 +375,6 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 	}
 });
 
-const logToFile = (msg) => {
-	fs.appendFileSync(
-		"./debug.log",
-		`${new Date().toISOString()} - ${msg}\n`
-	);
-};
-
 app.post("/api/comprobante", async (req, res) => {
 	try {
 		logToFile("=== POST /api/comprobante INICIADO ===");
@@ -501,6 +529,85 @@ app.get("/api/comprobante", (req, res) => {
 	return res.status(405).json({
 		error: "Usa POST /api/comprobante para emitir un comprobante electrónico",
 	});
+});
+
+app.get(["/api/consultar-cliente", "/consultar-cliente"], async (req, res) => {
+	try {
+		const { documento } = req.query;
+
+		if (!documento || documento.trim().length === 0) {
+			return res.status(400).json({ error: "Documento requerido" });
+		}
+
+		const docLimpio = documento.trim();
+		const esRuc = docLimpio.length === 11;
+		const esDni = docLimpio.length === 8;
+
+		if (!esRuc && !esDni) {
+			return res.status(400).json({
+				error: "El documento debe tener 8 dígitos (DNI) o 11 dígitos (RUC)",
+			});
+		}
+
+		const token = process.env.APISUNAT_TOKEN;
+		const personaId = process.env.APISUNAT_PERSONA_ID;
+
+		let denominacion = null;
+		const tipoDocumento = esRuc ? "6" : "1";
+
+		try {
+			const urls = [
+				`https://back.apisunat.com/personas/v1/getRUC?personaId=${personaId}&personaToken=${token}&ruc=${numero}`,
+				`https://back.apisunat.com/personas/v1/getDNI?personaId=${personaId}&personaToken=${token}&dni=${numero}`,
+			];
+
+			const response = await fetch(urlFinal, {
+				method: "GET",
+				headers: { "Content-Type": "application/json" },
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				console.log(`Respuesta APISUNAT:`, JSON.stringify(data));
+
+				denominacion =
+					data?.denominacion ||
+					data?.nombre ||
+					data?.razonSocial ||
+					data?.data?.denominacion ||
+					data?.data?.nombre ||
+					data?.data?.razonSocial ||
+					null;
+			} else {
+				const errText = await response.text();
+				console.warn(`APISUNAT respondió ${response.status}:`, errText);
+			}
+		} catch (err) {
+			console.error(`Error consultando APISUNAT:`, err.message);
+		}
+
+		if (denominacion) {
+			return res.status(200).json({
+				found: true,
+				documento: docLimpio,
+				denominacion: denominacion.trim(),
+				tipoDocumento,
+			});
+		} else {
+			return res.status(200).json({
+				found: false,
+				documento: docLimpio,
+				tipoDocumento,
+				mensaje: "No se encontraron datos. Por favor, ingresa el nombre manualmente.",
+			});
+		}
+	} catch (error) {
+		console.error("Error consultando cliente:", error);
+		return res.status(500).json({
+			error: "Error al consultar los datos del cliente",
+			detalles: error.message,
+		});
+	}
 });
 
 const iniciarServidor = async () => {
