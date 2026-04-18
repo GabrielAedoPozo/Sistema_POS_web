@@ -41,13 +41,13 @@ Este sistema está conectado con la **API REST de SUNAT** para la emisión elect
 | Funcionalidad                           | Estado           |
 |-----------------------------------------|------------------|
 | Conexión con API SUNAT                  | ✅ Conectado     |
-| Emisión de boletas electrónicas         | 🚧 En desarrollo |
-| Emisión de facturas electrónicas        | 🚧 En desarrollo |
+| Emisión de boletas electrónicas         | ✅ Conectado     |
+| Emisión de facturas electrónicas        | ✅ Conectado     |
 | Impresión de comprobantes (PDF/térmica) | 🔜 Próximamente  |
 | Validación de RUC en tiempo real        | 🔜 Próximamente  |
 
 ### Próximamente — Comprobantes electrónicos reales
-- Emisión de **boletas y facturas electrónicas** válidas ante SUNAT
+- Mejora de UI/UX
 - Impresión en formato **PDF** y **ticket térmico (80mm)**
 - Envío automático del comprobante al correo del cliente
 - Consulta del estado del comprobante en SUNAT
@@ -153,6 +153,14 @@ Este proyecto utiliza variables de entorno (`.env`) para proteger información s
 
 Desarrollado por **Gabriel Aedo**  
 Proyecto personal de aprendizaje y desarrollo full stack.
+
+---
+## Nota del autor
+
+He desarrollado este mini sistema con el fin de mejorarlo cada dia, ayudar a empresas que realmente lo necesitan y no paguen
+una fortuna, tambien que lo usen como un método más rapido de entrar un sistema, la mayoria de sistemas así, los veo seriamente
+desagradables visualmente, por ahora estoy intentando que no sea así y cada vez me hago preguntas como: ¿Que más le falta
+para que sea decente? Es mi meta algun día terminar estas preguntas, y por fin hacer un sistema digno.
 
 ---
 
