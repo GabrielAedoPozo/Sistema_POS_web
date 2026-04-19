@@ -33,16 +33,18 @@ const ejecutarSeed = async () => {
 			return;
 		}
 
-		console.log("Verificando si la tabla productos está vacía...");
+		console.log("Verificando si la tabla productos ya tiene el seed completo...");
 		const [rows] = await pool.query("SELECT COUNT(*) as total FROM productos");
 		const totalProductos = Number(rows?.[0]?.total || 0);
 
-		if (totalProductos > 0) {
-			console.log(`Seed omitido: ya existen ${totalProductos} productos en la base de datos.`);
+		if (totalProductos === TOTAL_PRODUCTOS_SEED) {
+			console.log(`Seed omitido: ya existen los ${TOTAL_PRODUCTOS_SEED} productos esperados.`);
 			return;
 		}
 
-		console.log("Tabla productos vacía. Ejecutando seed.sql...");
+		console.log(
+			`Se detectaron ${totalProductos} productos. Ejecutando seed.sql para dejar exactamente ${TOTAL_PRODUCTOS_SEED}.`
+		);
 		await pool.query(sql);
 
 		const [seedRows] = await pool.query("SELECT COUNT(*) as total FROM productos");
