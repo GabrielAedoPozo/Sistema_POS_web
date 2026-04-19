@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
 
 const PORT = process.env.PORT || 3000;
+const TOTAL_PRODUCTOS_SEED = 158;
 
 const ejecutarSeed = async () => {
 	try {
@@ -44,7 +45,17 @@ const ejecutarSeed = async () => {
 		console.log("Tabla productos vacía. Ejecutando seed.sql...");
 		await pool.query(sql);
 
-		console.log("Seed ejecutado correctamente.");
+		const [seedRows] = await pool.query("SELECT COUNT(*) as total FROM productos");
+		const totalSembrados = Number(seedRows?.[0]?.total || 0);
+
+		if (totalSembrados !== TOTAL_PRODUCTOS_SEED) {
+			console.warn(
+				`Seed ejecutado, pero se esperaban ${TOTAL_PRODUCTOS_SEED} productos y se encontraron ${totalSembrados}.`
+			);
+			return;
+		}
+
+		console.log(`Seed ejecutado correctamente con ${totalSembrados} productos.`);
 	} catch (error) {
 		console.error("Error ejecutando seed.sql:", error.message);
 		throw error;
