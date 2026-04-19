@@ -14,6 +14,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.2.2(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1))
+      concurrently:
+        specifier: ^9.2.1
+        version: 9.2.1
       jspdf:
         specifier: ^4.2.1
         version: 4.2.1
@@ -45,9 +48,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.1
         version: 6.0.1(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1))
-      concurrently:
-        specifier: ^9.2.1
-        version: 9.2.1
       eslint:
         specifier: ^9.39.4
         version: 9.39.4(jiti@2.6.1)
