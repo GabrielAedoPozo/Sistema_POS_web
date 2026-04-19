@@ -43,8 +43,9 @@ Este sistema está conectado con la **API REST de SUNAT** para la emisión elect
 | Conexión con API SUNAT                  | ✅ Conectado     |
 | Emisión de boletas electrónicas         | ✅ Conectado     |
 | Emisión de facturas electrónicas        | ✅ Conectado     |
+| Validación de RUC en tiempo real        | ✅ Conectado  |
 | Impresión de comprobantes (PDF/térmica) | 🔜 Próximamente  |
-| Validación de RUC en tiempo real        | 🔜 Próximamente  |
+
 
 ### Próximamente — Comprobantes electrónicos reales
 - Mejora de UI/UX
