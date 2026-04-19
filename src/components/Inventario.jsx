@@ -4,7 +4,7 @@ function Inventario({ products, loading, error, onRefresh, onUpdateStock }) {
   const [draftStocks, setDraftStocks] = useState({})
   const [savingId, setSavingId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const formatMoney = (amount) => `$${Number(amount).toFixed(2)}`
+  const formatMoney = (amount) => `S/ ${Number(amount).toFixed(2)}`
 
   useEffect(() => {
     const nextDrafts = {}

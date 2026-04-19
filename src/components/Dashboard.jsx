@@ -89,12 +89,50 @@ function Dashboard({ products, salesHistory }) {
   const productStats = analisisProductos()
   const tendencias = tendenciasSemanal()
 
+  const analisisDiaHora = () => {
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
+    const ventasPorDia = dias.map((dia) => ({ dia, unidades: 0 }))
+    const ventasPorHora = Array.from({ length: 24 }, (_, hora) => ({
+      hora,
+      unidades: 0,
+    }))
+
+    salesHistory.forEach((sale) => {
+      const fecha = new Date(sale.createdAt)
+      const diaIndex = fecha.getDay()
+      const hora = fecha.getHours()
+      const unidades = sale.items.reduce((sum, item) => sum + item.qty, 0)
+
+      ventasPorDia[diaIndex].unidades += unidades
+      ventasPorHora[hora].unidades += unidades
+    })
+
+    const picoDia = ventasPorDia.reduce((max, actual) =>
+      actual.unidades > max.unidades ? actual : max
+    , ventasPorDia[0])
+
+    const picoHora = ventasPorHora.reduce((max, actual) =>
+      actual.unidades > max.unidades ? actual : max
+    , ventasPorHora[0])
+
+    return {
+      ventasPorDia,
+      ventasPorHora,
+      picoDia,
+      picoHora,
+    }
+  }
+
   const topProductos = Object.entries(productStats)
     .sort(([, a], [, b]) => b.cantidadVendida - a.cantidadVendida)
     .slice(0, 5)
 
-  const formatMoney = (amount) => `$${Number(amount).toFixed(2)}`
+  const diaHora = analisisDiaHora()
+
+  const formatMoney = (amount) => `S/ ${Number(amount).toFixed(2)}`
   const maxVentas = Math.max(...tendencias.map((t) => t.ventas), 1)
+  const maxUnidadesDia = Math.max(...diaHora.ventasPorDia.map((d) => d.unidades), 1)
+  const maxUnidadesHora = Math.max(...diaHora.ventasPorHora.map((h) => h.unidades), 1)
 
   return (
     <section className='h-full flex flex-col overflow-hidden'>
@@ -110,28 +148,28 @@ function Dashboard({ products, salesHistory }) {
           <div className='bg-white rounded-xl border border-slate-300 p-6'>
             <h4 className='text-sm font-bold text-slate-800 mb-4'>⚡ KPIs Principales</h4>
             <div className='grid grid-cols-2 sm:grid-cols-4 gap-4'>
-              <div className='bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-4'>
+              <div className='bg-blue-50 rounded-xl border border-blue-200 p-4'>
                 <p className='text-xs text-blue-700 font-semibold mb-1'>Ventas Hoy</p>
                 <p className='text-2xl font-bold text-blue-900'>{kpis.ventasHoy}</p>
                 <p className='text-xs text-blue-700 mt-1'>{formatMoney(kpis.ingresoHoy)}</p>
               </div>
 
-              <div className='bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 p-4'>
-                <p className='text-xs text-green-700 font-semibold mb-1'>Total Ingresos</p>
-                <p className='text-2xl font-bold text-green-900'>{formatMoney(kpis.totalIngresos)}</p>
-                <p className='text-xs text-green-700 mt-1'>{kpis.totalVentas} ventas</p>
+              <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
+                <p className='text-xs text-slate-600 font-semibold mb-1'>Total Ingresos</p>
+                <p className='text-2xl font-bold text-slate-900'>{formatMoney(kpis.totalIngresos)}</p>
+                <p className='text-xs text-slate-600 mt-1'>{kpis.totalVentas} ventas</p>
               </div>
 
-              <div className='bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 p-4'>
-                <p className='text-xs text-purple-700 font-semibold mb-1'>Valor Inventario</p>
-                <p className='text-2xl font-bold text-purple-900'>{formatMoney(kpis.valorInventario)}</p>
-                <p className='text-xs text-purple-700 mt-1'>{kpis.productosTotal} productos</p>
+              <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
+                <p className='text-xs text-slate-600 font-semibold mb-1'>Valor Inventario</p>
+                <p className='text-2xl font-bold text-slate-900'>{formatMoney(kpis.valorInventario)}</p>
+                <p className='text-xs text-slate-600 mt-1'>{kpis.productosTotal} productos</p>
               </div>
 
-              <div className='bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 p-4'>
-                <p className='text-xs text-orange-700 font-semibold mb-1'>Stock Bajo</p>
-                <p className='text-2xl font-bold text-orange-900'>{stock.bajo.length}</p>
-                <p className='text-xs text-orange-700 mt-1'>productos críticos</p>
+              <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
+                <p className='text-xs text-slate-600 font-semibold mb-1'>Stock Bajo</p>
+                <p className='text-2xl font-bold text-slate-900'>{stock.bajo.length}</p>
+                <p className='text-xs text-slate-600 mt-1'>productos críticos</p>
               </div>
             </div>
           </div>
@@ -140,30 +178,30 @@ function Dashboard({ products, salesHistory }) {
           <div className='bg-white rounded-xl border border-slate-300 p-6'>
             <h4 className='text-sm font-bold text-slate-800 mb-4'>📦 Análisis de Stock</h4>
             <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-              <div className='bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200 p-4'>
-                <p className='text-xs text-yellow-700 font-semibold mb-1'>Stock Medio</p>
-                <p className='text-2xl font-bold text-yellow-900'>{stock.medio.length}</p>
-                <p className='text-xs text-yellow-700 mt-1'>productos normales</p>
+              <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
+                <p className='text-xs text-slate-600 font-semibold mb-1'>Stock Medio</p>
+                <p className='text-2xl font-bold text-slate-900'>{stock.medio.length}</p>
+                <p className='text-xs text-slate-600 mt-1'>productos normales</p>
               </div>
 
-              <div className='bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-300 p-4'>
+              <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
                 <p className='text-xs text-slate-700 font-semibold mb-1'>Stock Óptimo</p>
                 <p className='text-2xl font-bold text-slate-900'>{stock.alto.length}</p>
                 <p className='text-xs text-slate-700 mt-1'>productos en orden</p>
               </div>
 
-              <div className='bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl border border-cyan-200 p-4'>
-                <p className='text-xs text-cyan-700 font-semibold mb-1'>Promedio Stock</p>
-                <p className='text-2xl font-bold text-cyan-900'>
+              <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
+                <p className='text-xs text-slate-600 font-semibold mb-1'>Promedio Stock</p>
+                <p className='text-2xl font-bold text-slate-900'>
                   {products.length > 0 ? (products.reduce((sum, p) => sum + p.stock, 0) / products.length).toFixed(1) : '0'}
                 </p>
-                <p className='text-xs text-cyan-700 mt-1'>por producto</p>
+                <p className='text-xs text-slate-600 mt-1'>por producto</p>
               </div>
             </div>
           </div>
 
           {/* Sección 3: Gráficos */}
-          <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+          <div className='grid grid-cols-1 gap-6'>
             {/* Tendencias Semanal */}
             <div className='bg-white rounded-xl border border-slate-300 p-6'>
               <h4 className='text-sm font-bold text-slate-800 mb-4'>📈 Tendencia Últimos 7 Días</h4>
@@ -173,7 +211,7 @@ function Dashboard({ products, salesHistory }) {
                     <span className='text-xs font-semibold text-slate-600 w-10'>{t.dia}</span>
                     <div className='flex-1 h-6 bg-blue-100 rounded-lg overflow-hidden'>
                       <div
-                        className='h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all'
+                        className='h-full bg-linear-to-r from-blue-500 to-blue-600 transition-all'
                         style={{ width: `${(t.ventas / maxVentas) * 100}%` }}
                       ></div>
                     </div>
@@ -186,28 +224,55 @@ function Dashboard({ products, salesHistory }) {
               </div>
             </div>
 
-            {/* Top Productos */}
-            <div className='bg-white rounded-xl border border-slate-300 p-6'>
-              <h4 className='text-sm font-bold text-slate-800 mb-4'>🏆 Top 5 Productos Vendidos</h4>
-              <div className='space-y-2'>
-                {topProductos.length === 0 ? (
-                  <p className='text-xs text-slate-500'>Sin datos de ventas</p>
-                ) : (
-                  topProductos.map(([nombre, stats], idx) => (
-                    <div key={idx} className='bg-gradient-to-r from-slate-50 to-white rounded-lg p-3 border border-slate-200'>
-                      <div className='flex items-center justify-between mb-1'>
-                        <span className='text-xs font-semibold text-slate-900'>
-                          {idx + 1}. {nombre}
-                        </span>
-                        <span className='text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded'>{stats.cantidadVendida}</span>
+          
+          </div>
+
+          {/* Sección 4: Día y Hora con Mayor Venta */}
+          <div className='bg-white rounded-xl border border-slate-300 p-6'>
+            <div className='flex items-center justify-between mb-4 gap-3 flex-wrap'>
+              <h4 className='text-sm font-bold text-slate-800'>🕒 ¿Cuándo se vende más?</h4>
+              <p className='text-xs text-slate-600'>
+                Pico por día: <span className='font-semibold text-slate-800'>{diaHora.picoDia.dia}</span> ({diaHora.picoDia.unidades} u.)
+                {' | '}
+                Pico por hora: <span className='font-semibold text-slate-800'>{String(diaHora.picoHora.hora).padStart(2, '0')}:00</span> ({diaHora.picoHora.unidades} u.)
+              </p>
+            </div>
+
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              <div>
+                <p className='text-xs font-semibold text-slate-600 mb-3'>Unidades por día de la semana</p>
+                <div className='space-y-2'>
+                  {diaHora.ventasPorDia.map((item) => (
+                    <div key={item.dia} className='flex items-center gap-3'>
+                      <span className='w-20 text-xs font-semibold text-slate-600'>{item.dia.slice(0, 3)}</span>
+                      <div className='flex-1 h-5 bg-slate-100 rounded overflow-hidden'>
+                        <div
+                          className='h-full bg-linear-to-r from-blue-500 to-blue-600'
+                          style={{ width: `${(item.unidades / maxUnidadesDia) * 100}%` }}
+                        ></div>
                       </div>
-                      <div className='flex items-center justify-between text-xs'>
-                        <span className='text-slate-600'>{stats.ordenes} órdenes</span>
-                        <span className='text-green-700 font-semibold'>{formatMoney(stats.montoTotal)}</span>
-                      </div>
+                      <span className='w-14 text-right text-xs font-bold text-slate-800'>{item.unidades} u.</span>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className='text-xs font-semibold text-slate-600 mb-3'>Unidades por hora (24h)</p>
+                <div className='grid grid-cols-6 gap-2'>
+                  {diaHora.ventasPorHora.map((item) => (
+                    <div key={item.hora} className='rounded-lg border border-slate-200 p-2 bg-slate-50'>
+                      <p className='text-[10px] text-slate-500 mb-1'>{String(item.hora).padStart(2, '0')}:00</p>
+                      <div className='h-2 bg-slate-200 rounded overflow-hidden'>
+                        <div
+                          className='h-full bg-blue-600'
+                          style={{ width: `${(item.unidades / maxUnidadesHora) * 100}%` }}
+                        ></div>
+                      </div>
+                      <p className='text-[10px] font-semibold text-slate-700 mt-1'>{item.unidades} u.</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

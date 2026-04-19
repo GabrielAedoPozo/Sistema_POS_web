@@ -13,15 +13,6 @@ function Menu({ onNewSale, activeSection, onSectionChange }) {
       <div className="flex flex-col gap-2 text-sm shrink-0 mt-10 gap-4">
         <button
           className={`h-12 rounded-xl px-4 flex items-center gap-3 font-semibold text-[1.4rem] tracking-wide ${
-            dashboardActive ? 'bg-blue-100 text-blue-800' : 'text-slate-700 hover:bg-slate-200'
-          }`}
-          onClick={() => onSectionChange('dashboard')}
-        >
-          <i className="fa-solid fa-gauge"></i>
-          Dashboard
-        </button>
-        <button
-          className={`h-12 rounded-xl px-4 flex items-center gap-3 font-semibold text-[1.4rem] tracking-wide ${
             salesActive ? 'bg-blue-100 text-blue-800' : 'text-slate-700 hover:bg-slate-200'
           }`}
           onClick={() => onSectionChange('ventas')}
@@ -29,6 +20,15 @@ function Menu({ onNewSale, activeSection, onSectionChange }) {
         >
           <i className="fa-solid fa-cash-register"></i>
           Ventas
+        </button>
+        <button
+          className={`h-12 rounded-xl px-4 flex items-center gap-3 font-semibold text-[1.4rem] tracking-wide ${
+            dashboardActive ? 'bg-blue-100 text-blue-800' : 'text-slate-700 hover:bg-slate-200'
+          }`}
+          onClick={() => onSectionChange('dashboard')}
+        >
+          <i className="fa-solid fa-gauge"></i>
+          Dashboard
         </button>
         <button
           className={`h-12 rounded-xl px-4 flex items-center gap-3 font-semibold text-[1.4rem] tracking-wide transition-colors duration-150 ${

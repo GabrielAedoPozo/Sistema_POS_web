@@ -1,3 +1,12 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, ".env") });
+
 import express from "express";
 import cors from "cors";
 import fs from "fs";
@@ -112,33 +121,9 @@ const logToFile = (msg) => {
 app.use(cors());
 app.use(express.json());
 
-// ✅ Debug endpoint — ANTES del middleware que reescribe URLs
-app.get("/api/debug-ruc/:numero", async (req, res) => {
-	const numero = req.params.numero;
-	const token = process.env.APISUNAT_TOKEN;
-	const personaId = process.env.APISUNAT_PERSONA_ID;
 
-	const urls = [
-		`https://back.apisunat.com/personas/v1/getRUC?personaId=${personaId}&personaToken=${token}&ruc=${numero}`,
-		`https://back.apisunat.com/personas/v1/getDNI?personaId=${personaId}&personaToken=${token}&dni=${numero}`,
-	];
 
-	const resultados = [];
 
-	for (const url of urls) {
-		try {
-			const response = await fetch(url);
-			const text = await response.text();
-			let json = null;
-			try { json = JSON.parse(text); } catch {}
-			resultados.push({ url, status: response.status, body: json || text });
-		} catch (err) {
-			resultados.push({ url, error: err.message });
-		}
-	}
-
-	return res.json(resultados);
-});
 
 app.use((req, res, next) => {
 	if (req.url.startsWith("/api/comprobante")) {
@@ -549,58 +534,72 @@ app.get(["/api/consultar-cliente", "/consultar-cliente"], async (req, res) => {
 			});
 		}
 
-		const token = process.env.APISUNAT_TOKEN;
-		const personaId = process.env.APISUNAT_PERSONA_ID;
-
-		let denominacion = null;
+		const token = process.env.APIS_NET_PE_TOKEN;
 		const tipoDocumento = esRuc ? "6" : "1";
 
-		try {
-			const urls = [
-				`https://back.apisunat.com/personas/v1/getRUC?personaId=${personaId}&personaToken=${token}&ruc=${numero}`,
-				`https://back.apisunat.com/personas/v1/getDNI?personaId=${personaId}&personaToken=${token}&dni=${numero}`,
-			];
+		if (!token) {
+			return res.status(500).json({
+				error: "Falta APIS_NET_PE_TOKEN en .env",
+			});
+		}
 
+		// Solo RUC por ahora (DNI requiere plan pagado)
+		if (esDni) {
+			return res.status(200).json({
+				found: false,
+				documento: docLimpio,
+				tipoDocumento,
+				mensaje: "Ingresa el nombre del cliente manualmente",
+			});
+		}
+
+		const urlFinal = `https://api.decolecta.com/v1/sunat/ruc?numero=${docLimpio}`;
+
+		let denominacion = null;
+
+		try {
 			const response = await fetch(urlFinal, {
 				method: "GET",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Accept": "application/json",
+					"Authorization": `Bearer ${token}`,
+				},
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				console.log(`Respuesta APISUNAT:`, JSON.stringify(data));
+			const text = await response.text();
+			let data = null;
+			try {
+				data = JSON.parse(text);
+			} catch {
+				console.warn("Respuesta no-JSON:", text);
+			}
 
-				denominacion =
-					data?.denominacion ||
-					data?.nombre ||
-					data?.razonSocial ||
-					data?.data?.denominacion ||
-					data?.data?.nombre ||
-					data?.data?.razonSocial ||
-					null;
+			console.log(`Respuesta apis.net.pe (RUC):`, JSON.stringify(data));
+
+			if (response.ok && data) {
+				denominacion = data?.razon_social || data?.razonSocial || data?.nombre || null;
 			} else {
-				const errText = await response.text();
-				console.warn(`APISUNAT respondió ${response.status}:`, errText);
+				console.warn(`apis.net.pe respondió ${response.status}:`, text);
 			}
 		} catch (err) {
-			console.error(`Error consultando APISUNAT:`, err.message);
+			console.error(`Error consultando apis.net.pe:`, err.message);
 		}
 
 		if (denominacion) {
 			return res.status(200).json({
 				found: true,
 				documento: docLimpio,
-				denominacion: denominacion.trim(),
+				denominacion: denominacion.trim().toUpperCase(),
 				tipoDocumento,
-			});
-		} else {
-			return res.status(200).json({
-				found: false,
-				documento: docLimpio,
-				tipoDocumento,
-				mensaje: "No se encontraron datos. Por favor, ingresa el nombre manualmente.",
 			});
 		}
+
+		return res.status(200).json({
+			found: false,
+			documento: docLimpio,
+			tipoDocumento,
+			mensaje: "No se encontraron datos. Por favor, ingresa el nombre manualmente.",
+		});
 	} catch (error) {
 		console.error("Error consultando cliente:", error);
 		return res.status(500).json({

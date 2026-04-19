@@ -101,7 +101,7 @@ function Reportes({ salesHistory }) {
 
   const predictions = calculatePredictions()
 
-  const formatMoney = (amount) => `$${amount.toFixed(2)}`
+  const formatMoney = (amount) => `S/ ${amount.toFixed(2)}`
   const formatDate = (isoDate) => {
     return new Date(isoDate).toLocaleString('es-PE', {
       dateStyle: 'short',
@@ -137,15 +137,6 @@ function Reportes({ salesHistory }) {
           </p>
         </div>
 
-        <div className='bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-orange-200 p-4'>
-          <p className='text-sm text-orange-700 mb-1 font-semibold'>⚡ Trending</p>
-          <p className='text-lg font-bold text-orange-800'>
-            {predictions.length > 0 ? predictions[0].product : 'N/A'}
-          </p>
-          <p className='text-xs text-orange-700 mt-1'>
-            {predictions.length > 0 ? `~${predictions[0].prediction} mañana` : 'Sin datos'}
-          </p>
-        </div>
       </div>
 
       {/* Predicciones y Alertas */}

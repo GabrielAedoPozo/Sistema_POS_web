@@ -150,7 +150,8 @@ function App() {
 
     return products.filter((product) => {
       return (
-        product.nombre.toLowerCase().includes(term)
+        product.nombre.toLowerCase().includes(term) ||
+        String(product.id).includes(term)
       )
     })
   }, [products, search])
@@ -386,7 +387,8 @@ function App() {
     sendSale()
   }
 
-  const formatMoney = (amount) => `$${amount.toFixed(2)}`
+  const formatMoney = (amount) => `S/ ${amount.toFixed(2)}`
+  const showOrderPanel = activeSection === 'ventas'
 
   return (
     <div className='bg-slate-200 h-screen flex overflow-hidden'>
@@ -438,8 +440,9 @@ function App() {
             )}
 
             <div className='bg-white border border-slate-300 rounded-xl overflow-hidden flex flex-col flex-1 min-h-0'>
-              <div className='grid grid-cols-[1fr_110px] px-5 py-2 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
+              <div className='grid grid-cols-[1fr_90px_110px] px-5 py-2 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
                 <p>PRODUCT NAME</p>
+                <p>ID</p>
                 <p>PRICE</p>
               </div>
 
@@ -447,7 +450,7 @@ function App() {
               {filteredProducts.map((product, index) => (
                 <div
                   key={product.id}
-                  className={`grid grid-cols-[1fr_110px] px-5 py-2.5 border-t border-slate-200 items-center ${
+                  className={`grid grid-cols-[1fr_90px_110px] px-5 py-2.5 border-t border-slate-200 items-center ${
                     index === 1 ? 'bg-slate-100' : 'bg-white'
                   }`}
                 >
@@ -455,6 +458,7 @@ function App() {
                     <p className='text-base text-slate-900'>{product.nombre}</p>
                     <p className='text-xs text-slate-500'>Stock: {product.stock}</p>
                   </div>
+                  <p className='text-blue-800 font-semibold text-sm'>#{product.id}</p>
                   <div className='text-blue-800 font-semibold flex items-center justify-between'>
                     <span>{formatMoney(Number(product.precio))}</span>
                     <button
@@ -498,22 +502,39 @@ function App() {
         )}
       </main>
 
-      <Orden
-        orderItems={orderItems}
-        subtotal={subtotal}
-        tax={tax}
-        total={total}
-        paymentMethod={paymentMethod}
-        customerDocument={customerDocument}
-        customerName={customerName}
-        onPaymentSelect={setPaymentMethod}
-        onCustomerDocumentChange={setCustomerDocument}
-        onCustomerNameChange={setCustomerName}
-        onUpdateQty={updateQty}
-        onClearOrder={clearOrder}
-        onCheckout={handleCheckout}
-        disabled={activeSection !== 'ventas'}
-      />
+      {showOrderPanel ? (
+        <Orden
+          orderItems={orderItems}
+          subtotal={subtotal}
+          tax={tax}
+          total={total}
+          paymentMethod={paymentMethod}
+          customerDocument={customerDocument}
+          customerName={customerName}
+          onPaymentSelect={setPaymentMethod}
+          onCustomerDocumentChange={setCustomerDocument}
+          onCustomerNameChange={setCustomerName}
+          onUpdateQty={updateQty}
+          onClearOrder={clearOrder}
+          onCheckout={handleCheckout}
+          disabled={false}
+        />
+      ) : (
+        <aside className='w-100 h-screen bg-slate-100 p-4 flex flex-col overflow-hidden border-l border-slate-300'>
+          <div className='flex items-center justify-between mt-4 shrink-0'>
+            <h2 className='text-3xl font-semibold text-slate-900'>Orden Actual</h2>
+          </div>
+
+          <div className='mt-5 flex-1 min-h-0 flex items-center justify-center'>
+            <div className='w-full rounded-xl border border-slate-200 bg-white px-5 py-6 text-center'>
+              <p className='text-base font-semibold text-slate-900 mb-1'>Esta sección se muestra solo en Ventas.</p>
+              <p className='text-sm text-slate-500'>
+                Cambia a Ventas para ver la orden, agregar productos y continuar con el cobro.
+              </p>
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   )
 }

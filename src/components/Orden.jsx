@@ -17,7 +17,7 @@ function Orden({
     disabled
 }){
     const paymentMethods = ['EFECTIVO', 'TARJETA', 'YAPE', 'PLIN']
-    const formatMoney = (amount) => `$${amount.toFixed(2)}`
+    const formatMoney = (amount) => `S/ ${amount.toFixed(2)}`
     const timeoutRef = useRef(null)
     const [searching, setSearching] = useState(false)
 
@@ -70,6 +70,12 @@ function Orden({
                 <button className="text-red-700 text-sm font-semibold disabled:opacity-50" onClick={onClearOrder} disabled={disabled}><i className="fa-solid fa-trash mr-1"></i> Eliminar Orden</button>
             </div>
 
+            {disabled && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Esta sección se muestra solo en <span className="font-semibold text-slate-800">Ventas</span>.
+                </div>
+            )}
+
             <div className="mt-5 flex-1 min-h-0 overflow-y-auto pr-1">
                 {orderItems.length === 0 && (
                     <div className="h-full rounded-xl border border-dashed border-slate-300 text-slate-500 flex items-center justify-center text-sm bg-white">
@@ -81,7 +87,7 @@ function Orden({
                     {orderItems.map((item) => (
                         <div key={item.id} className="bg-white rounded-xl p-3 border border-slate-200">
                             <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-                            <p className="text-xs text-slate-500 mb-2">{item.type}</p>
+                            <p className="text-xs text-slate-500 mb-2">ID: {item.id} | {item.type}</p>
 
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-sm">
