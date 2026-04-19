@@ -14,7 +14,7 @@ import pool from "./db.js";
 import { emitirBoleta, emitirFactura } from "./apisunat.js";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const PRODUCTOS_INICIALES = [
 	{ nombre: "Pan", precio: 2.5, stock: 10 },
@@ -41,26 +41,61 @@ const sembrarProductosIniciales = async () => {
 };
 
 const crearTablaComprobantes = async () => {
-	await pool.query(
-		`CREATE TABLE IF NOT EXISTS comprobantes (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			venta_id INT NOT NULL,
-			tipo_documento VARCHAR(20) NOT NULL,
-			serie VARCHAR(10) NOT NULL,
-			numero VARCHAR(20) NOT NULL,
-			cliente_tipo_documento CHAR(1) NOT NULL,
-			cliente_numero_documento VARCHAR(20) NOT NULL,
-			cliente_denominacion VARCHAR(255) NOT NULL,
-			xml LONGTEXT NULL,
-			pdf LONGTEXT NULL,
-			cdr LONGTEXT NULL,
-			hash VARCHAR(255) NULL,
-			respuesta_json JSON NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE KEY uq_comprobante_venta (venta_id),
-			CONSTRAINT fk_comprobante_venta FOREIGN KEY (venta_id) REFERENCES ventas(id)
-		)`
-	);
+    // Tabla productos
+    await pool.query(
+        `CREATE TABLE IF NOT EXISTS productos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nombre VARCHAR(255) NOT NULL,
+            precio DECIMAL(10, 2) NOT NULL,
+            stock INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`
+    );
+
+    // Tabla ventas
+    await pool.query(
+        `CREATE TABLE IF NOT EXISTS ventas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            total DECIMAL(10, 2) NOT NULL,
+            metodo_pago VARCHAR(50) NOT NULL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`
+    );
+
+    // Tabla detalle_venta
+    await pool.query(
+        `CREATE TABLE IF NOT EXISTS detalle_venta (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            venta_id INT NOT NULL,
+            producto_id INT NOT NULL,
+            cantidad INT NOT NULL,
+            precio DECIMAL(10, 2) NOT NULL,
+            CONSTRAINT fk_detalle_venta FOREIGN KEY (venta_id) REFERENCES ventas(id),
+            CONSTRAINT fk_detalle_producto FOREIGN KEY (producto_id) REFERENCES productos(id)
+        )`
+    );
+
+    // Tabla comprobantes (la que ya tenías)
+    await pool.query(
+        `CREATE TABLE IF NOT EXISTS comprobantes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            venta_id INT NOT NULL,
+            tipo_documento VARCHAR(20) NOT NULL,
+            serie VARCHAR(10) NOT NULL,
+            numero VARCHAR(20) NOT NULL,
+            cliente_tipo_documento CHAR(1) NOT NULL,
+            cliente_numero_documento VARCHAR(20) NOT NULL,
+            cliente_denominacion VARCHAR(255) NOT NULL,
+            xml LONGTEXT NULL,
+            pdf LONGTEXT NULL,
+            cdr LONGTEXT NULL,
+            hash VARCHAR(255) NULL,
+            respuesta_json JSON NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_comprobante_venta (venta_id),
+            CONSTRAINT fk_comprobante_venta FOREIGN KEY (venta_id) REFERENCES ventas(id)
+        )`
+    );
 };
 
 const redondear2 = (valor) => Number(Number(valor).toFixed(2));
@@ -613,8 +648,8 @@ const iniciarServidor = async () => {
 	try {
 		await crearTablaComprobantes();
 		await sembrarProductosIniciales();
-		app.listen(PORT, () => {
-			console.log(`Servidor backend corriendo en http://localhost:${PORT}`);
+		app.listen(PORT, "0.0.0.0", () => {
+			console.log(`Servidor backend corriendo en puerto ${PORT}`);
 		});
 	} catch (error) {
 		console.error("Error al iniciar el servidor:", error.message);
