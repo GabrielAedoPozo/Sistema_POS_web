@@ -5,31 +5,12 @@ import Orden from './components/Orden.jsx'
 import Reportes from './components/Reportes.jsx'
 import Inventario from './components/Inventario.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import { apiFetch } from './api.js'
 import './styles/style.css'
 import '@fontsource/onest/300.css';
 import '@fontsource/onest/400.css';
 import '@fontsource/onest/500.css';
 import '@fontsource/onest/600.css';
-
-const API_URL = import.meta.env.VITE_API_URL || ''
-
-const API_BASES = [API_URL, '', 'http://localhost:3000', 'http://127.0.0.1:3000']
-
-const normalizarBase = (base) => {
-  if (!base) return ''
-  return base.endsWith('/') ? base.slice(0, -1) : base
-}
-
-const construirUrl = (base, path) => {
-  const baseNormalizada = normalizarBase(base)
-  if (!baseNormalizada) return path
-  return `${baseNormalizada}${path}`
-}
-
-const esRespuestaJson = (response) => {
-  const contentType = response.headers.get('content-type') || ''
-  return contentType.toLowerCase().includes('application/json')
-}
 
 const normalizarMensajeError = (error, fallback) => {
   const msg = String(error?.message || '').toLowerCase()
@@ -40,35 +21,6 @@ const normalizarMensajeError = (error, fallback) => {
 
   return error?.message || fallback
 }
-
-const fetchConFallback = async (paths, options) => {
-  let ultimoError = null
-
-  for (const base of API_BASES) {
-    for (const path of paths) {
-      const url = construirUrl(base, path)
-
-      try {
-        const response = await fetch(url, options)
-
-        if (response.status === 404) {
-          continue
-        }
-
-        if (!esRespuestaJson(response)) {
-          continue
-        }
-
-        return response
-      } catch (error) {
-        ultimoError = error
-      }
-    }
-  }
-
-  throw ultimoError || new Error('No se pudo obtener una respuesta JSON del backend')
-}
-
 
 function App() {
   const [search, setSearch] = useState('')
@@ -89,7 +41,7 @@ function App() {
     setProductsError('')
 
     try {
-      const response = await fetchConFallback(['/api/productos', '/productos'])
+      const response = await apiFetch('/api/productos')
       if (!response.ok) {
         throw new Error('No se pudo obtener productos')
       }
@@ -105,7 +57,7 @@ function App() {
 
   const fetchSalesHistory = async () => {
     try {
-      const response = await fetchConFallback(['/api/ventas', '/ventas'])
+      const response = await apiFetch('/api/ventas')
 
       if (!response.ok) {
         throw new Error('No se pudo obtener el historial de ventas')
@@ -119,10 +71,7 @@ function App() {
   }
 
   const updateProductStock = async (product, nextStock) => {
-    const response = await fetchConFallback([
-      `/api/productos/${product.id}`,
-      `/productos/${product.id}`,
-    ], {
+    const response = await apiFetch(`/api/productos/${product.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -306,7 +255,7 @@ function App() {
           }))
         }
 
-        const response = await fetchConFallback(['/api/ventas', '/ventas'], {
+        const response = await apiFetch('/api/ventas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -348,7 +297,7 @@ function App() {
           })),
         }
 
-        const comprobanteResponse = await fetch(construirUrl(API_URL, '/api/comprobante'), {
+        const comprobanteResponse = await apiFetch('/api/comprobante', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(comprobantePayload),

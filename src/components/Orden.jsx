@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { apiFetch } from '../api.js'
 
 function Orden({
     orderItems,
@@ -36,7 +37,7 @@ function Orden({
                 
                 const buscarCliente = async () => {
                     try {
-                        const response = await fetch(`/api/consultar-cliente?documento=${customerDocument}`)
+                        const response = await apiFetch(`/api/consultar-cliente?documento=${encodeURIComponent(customerDocument)}`)
                         const data = await response.json()
 
                         console.log('Respuesta del servidor:', data)
