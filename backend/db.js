@@ -19,4 +19,37 @@ const pool = mysql.createPool({
 	queueLimit: 0,
 });
 
+export const initDB = async () => {
+	await pool.query(
+		`CREATE TABLE IF NOT EXISTS productos (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			nombre VARCHAR(255) NOT NULL,
+			precio DECIMAL(10, 2) NOT NULL,
+			stock INT NOT NULL DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`
+	);
+
+	await pool.query(
+		`CREATE TABLE IF NOT EXISTS ventas (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			total DECIMAL(10, 2) NOT NULL,
+			metodo_pago VARCHAR(50) NOT NULL,
+			fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`
+	);
+
+	await pool.query(
+		`CREATE TABLE IF NOT EXISTS detalle_venta (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			venta_id INT NOT NULL,
+			producto_id INT NOT NULL,
+			cantidad INT NOT NULL,
+			precio DECIMAL(10, 2) NOT NULL,
+			CONSTRAINT fk_detalle_venta FOREIGN KEY (venta_id) REFERENCES ventas(id),
+			CONSTRAINT fk_detalle_producto FOREIGN KEY (producto_id) REFERENCES productos(id)
+		)`
+	);
+};
+
 export default pool;

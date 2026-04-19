@@ -1,81 +1,58 @@
 import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import pool, { initDB } from "./db.js";
+import { emitirBoleta, emitirFactura } from "./apisunat.js";
+
+const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-import express from "express";
-import cors from "cors";
-import fs from "fs";
-import pool from "./db.js";
-import { emitirBoleta, emitirFactura } from "./apisunat.js";
-
-const app = express();
 const PORT = process.env.PORT || 3000;
 
-const PRODUCTOS_INICIALES = [
-	{ nombre: "Pan", precio: 2.5, stock: 10 },
-	{ nombre: "Leche", precio: 4.2, stock: 10 },
-	{ nombre: "Huevos", precio: 7.8, stock: 10 },
-	{ nombre: "Arroz", precio: 3.6, stock: 10 },
-	{ nombre: "Aceite", precio: 9.5, stock: 10 },
-];
+const ejecutarSeed = async () => {
+	try {
+		const seedPath = path.join(__dirname, "seed.sql");
 
-const sembrarProductosIniciales = async () => {
-	for (const producto of PRODUCTOS_INICIALES) {
-		const [rows] = await pool.query(
-			"SELECT id FROM productos WHERE nombre = ? LIMIT 1",
-			[producto.nombre]
-		);
-
-		if (rows.length === 0) {
-			await pool.query(
-				"INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
-				[producto.nombre, producto.precio, producto.stock]
-			);
+		if (!fs.existsSync(seedPath)) {
+			console.warn(`No se encontró seed.sql en ${seedPath}. Se omite siembra inicial.`);
+			return;
 		}
+
+		const sql = fs.readFileSync(seedPath, "utf8");
+
+		if (!sql.trim()) {
+			console.warn("seed.sql está vacío. No se ejecutará el seed.");
+			return;
+		}
+
+		console.log("Verificando si la tabla productos está vacía...");
+		const [rows] = await pool.query("SELECT COUNT(*) as total FROM productos");
+		const totalProductos = Number(rows?.[0]?.total || 0);
+
+		if (totalProductos > 0) {
+			console.log(`Seed omitido: ya existen ${totalProductos} productos en la base de datos.`);
+			return;
+		}
+
+		console.log("Tabla productos vacía. Ejecutando seed.sql...");
+		await pool.query(sql);
+
+		console.log("Seed ejecutado correctamente.");
+	} catch (error) {
+		console.error("Error ejecutando seed.sql:", error.message);
+		throw error;
 	}
 };
 
 const crearTablaComprobantes = async () => {
-    // Tabla productos
-    await pool.query(
-        `CREATE TABLE IF NOT EXISTS productos (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            nombre VARCHAR(255) NOT NULL,
-            precio DECIMAL(10, 2) NOT NULL,
-            stock INT NOT NULL DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`
-    );
-
-    // Tabla ventas
-    await pool.query(
-        `CREATE TABLE IF NOT EXISTS ventas (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            total DECIMAL(10, 2) NOT NULL,
-            metodo_pago VARCHAR(50) NOT NULL,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`
-    );
-
-    // Tabla detalle_venta
-    await pool.query(
-        `CREATE TABLE IF NOT EXISTS detalle_venta (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            venta_id INT NOT NULL,
-            producto_id INT NOT NULL,
-            cantidad INT NOT NULL,
-            precio DECIMAL(10, 2) NOT NULL,
-            CONSTRAINT fk_detalle_venta FOREIGN KEY (venta_id) REFERENCES ventas(id),
-            CONSTRAINT fk_detalle_producto FOREIGN KEY (producto_id) REFERENCES productos(id)
-        )`
-    );
-
-    // Tabla comprobantes (la que ya tenías)
+	// Tabla comprobantes
     await pool.query(
         `CREATE TABLE IF NOT EXISTS comprobantes (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -646,8 +623,9 @@ app.get(["/api/consultar-cliente", "/consultar-cliente"], async (req, res) => {
 
 const iniciarServidor = async () => {
 	try {
+		await initDB();
 		await crearTablaComprobantes();
-		await sembrarProductosIniciales();
+		await ejecutarSeed();
 		app.listen(PORT, "0.0.0.0", () => {
 			console.log(`Servidor backend corriendo en puerto ${PORT}`);
 		});
