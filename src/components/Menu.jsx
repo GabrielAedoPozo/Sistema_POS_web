@@ -1,4 +1,4 @@
-function Menu({ onNewSale, activeSection, onSectionChange }) {
+function Menu({ onNewSale, activeSection, onSectionChange, canManageInventory }) {
   const dashboardActive = activeSection === 'dashboard'
   const salesActive = activeSection === 'ventas'
   const inventoryActive = activeSection === 'inventario'
@@ -31,13 +31,16 @@ function Menu({ onNewSale, activeSection, onSectionChange }) {
           Dashboard
         </button>
         <button
-          className={`h-12 rounded-xl px-4 flex items-center gap-3 font-semibold text-[1.4rem] tracking-wide transition-colors duration-150 ${
+          className={`h-12 rounded-xl px-4 flex items-center justify-between font-semibold text-[1.4rem] tracking-wide transition-colors duration-150 ${
             inventoryActive ? 'bg-blue-100 text-blue-800' : 'text-slate-700 hover:bg-slate-200'
           }`}
           onClick={() => onSectionChange('inventario')}
         >
-          <i className="fa-solid fa-box"></i>
-          Inventario
+          <span className='flex items-center gap-3'>
+            <i className="fa-solid fa-box"></i>
+            Inventario
+          </span>
+          {!canManageInventory && <i className='fa-solid fa-lock text-xs text-slate-500' title='Solo admin puede editar' />}
         </button>
         <button
           className={`h-12 rounded-xl px-4 flex items-center gap-3 font-semibold text-[1.4rem] tracking-wide transition-colors duration-150 ${

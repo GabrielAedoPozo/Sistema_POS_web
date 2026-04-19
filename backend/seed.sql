@@ -1,5 +1,6 @@
 -- Limpiar tabla (opcional)
 DELETE FROM productos;
+ALTER TABLE productos AUTO_INCREMENT = 1;
 
 INSERT INTO productos (nombre, precio, stock) VALUES
 ('ADICIONAL HAMB CARNE', 0, 0),

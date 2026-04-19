@@ -23,6 +23,16 @@ const normalizarMensajeError = (error, fallback) => {
 }
 
 function App() {
+  const CLAVES_POR_ROL = {
+    admin: '34',
+    usuario: '12',
+  }
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [selectedRole, setSelectedRole] = useState('usuario')
+  const [currentRole, setCurrentRole] = useState('')
+  const [accessKey, setAccessKey] = useState('')
+  const [accessError, setAccessError] = useState('')
   const [search, setSearch] = useState('')
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
@@ -35,6 +45,7 @@ function App() {
   const [customerName, setCustomerName] = useState('')
   const [activeSection, setActiveSection] = useState('ventas')
   const [salesHistory, setSalesHistory] = useState([])
+  const canManageInventory = currentRole === 'admin'
 
   const fetchProducts = async () => {
     setLoadingProducts(true)
@@ -70,14 +81,18 @@ function App() {
     }
   }
 
-  const updateProductStock = async (product, nextStock) => {
+  const updateProductData = async (product, updates) => {
+    if (!canManageInventory) {
+      throw new Error('Solo admin puede editar inventario')
+    }
+
     const response = await apiFetch(`/api/productos/${product.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: product.nombre,
-        precio: product.precio,
-        stock: nextStock,
+        precio: updates.precio,
+        stock: updates.stock,
       }),
     })
 
@@ -89,9 +104,27 @@ function App() {
   }
 
   useEffect(() => {
+    if (!isAuthenticated) return
+
     fetchProducts()
     fetchSalesHistory()
-  }, [])
+  }, [isAuthenticated])
+
+  const handleAccessSubmit = (event) => {
+    event.preventDefault()
+
+    const claveEsperada = CLAVES_POR_ROL[selectedRole]
+
+    if (accessKey.trim() !== claveEsperada) {
+      setAccessError('Clave incorrecta para el rol seleccionado')
+      return
+    }
+
+    setCurrentRole(selectedRole)
+    setIsAuthenticated(true)
+    setAccessError('')
+    setAccessKey('')
+  }
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -338,13 +371,101 @@ function App() {
 
   const formatMoney = (amount) => `S/ ${amount.toFixed(2)}`
   const showOrderPanel = activeSection === 'ventas'
+  const sessionRoleLabel = currentRole === 'admin' ? 'Administrador' : 'Usuario'
+
+  if (!isAuthenticated) {
+    return (
+      <div className='min-h-screen bg-linear-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4'>
+        <div className='w-full max-w-md bg-white border border-blue-300/40 rounded-3xl shadow-[0_24px_70px_rgba(10,27,74,0.45)] p-7'>
+          <p className='text-xs font-semibold tracking-[0.2em] text-blue-900'>POS SYSTEM</p>
+          <h1 className='text-2xl font-semibold text-slate-950 mt-2'>Acceso al sistema</h1>
+          <p className='text-sm text-slate-600 mt-1'>Selecciona tu rol e ingresa la clave para continuar.</p>
+
+          <form onSubmit={handleAccessSubmit} className='mt-6 space-y-4'>
+            <div>
+              <p className='text-sm font-medium text-blue-900 mb-2'>Rol</p>
+              <div className='grid grid-cols-2 gap-2'>
+                <button
+                  type='button'
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                    selectedRole === 'admin'
+                      ? 'bg-blue-900 text-white border-blue-900 shadow-sm'
+                      : 'bg-white text-blue-900 border-blue-300 hover:bg-blue-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedRole('admin')
+                    setAccessError('')
+                  }}
+                >
+                  Admin
+                </button>
+                <button
+                  type='button'
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                    selectedRole === 'usuario'
+                      ? 'bg-blue-900 text-white border-blue-900 shadow-sm'
+                      : 'bg-white text-blue-900 border-blue-300 hover:bg-blue-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedRole('usuario')
+                    setAccessError('')
+                  }}
+                >
+                  Usuario
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className='text-sm font-medium text-blue-900 block mb-2' htmlFor='clave-acceso'>
+                Clave
+              </label>
+              <input
+                id='clave-acceso'
+                type='password'
+                value={accessKey}
+                onChange={(event) => {
+                  setAccessKey(event.target.value)
+                  if (accessError) setAccessError('')
+                }}
+                className='w-full rounded-xl border border-blue-300 px-3 py-2.5 text-blue-950 outline-none focus:border-blue-700 bg-blue-50/40'
+                placeholder='Ingresa la clave'
+                autoComplete='off'
+              />
+            </div>
+
+            {accessError && (
+              <div className='rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'>
+                {accessError}
+              </div>
+            )}
+
+            <button
+              type='submit'
+              className='w-full rounded-xl bg-blue-900 text-white font-semibold py-2.5 hover:bg-blue-950 transition-colors shadow-sm'
+            >
+              Entrar
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='bg-slate-200 h-screen flex overflow-hidden'>
+      <div className='absolute top-3 right-4 z-10 flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-950 px-3 py-2 shadow-md'>
+        <span className='inline-flex h-2.5 w-2.5 rounded-full bg-blue-300 ring-2 ring-blue-800' aria-hidden='true'></span>
+        <div className='leading-tight'>
+          <p className='text-[10px] uppercase tracking-wide text-blue-200 font-semibold'>Sesion activa</p>
+          <p className='text-xs font-semibold text-white'>{sessionRoleLabel}</p>
+        </div>
+      </div>
       <Menu
         onNewSale={handleNewSale}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
+        canManageInventory={canManageInventory}
       />
 
       <main className='flex-1 px-6 py-4 border-r border-slate-300 flex flex-col overflow-hidden min-w-0'>
@@ -442,7 +563,8 @@ function App() {
             loading={loadingProducts}
             error={productsError}
             onRefresh={fetchProducts}
-            onUpdateStock={updateProductStock}
+            onUpdateProduct={updateProductData}
+            canManageInventory={canManageInventory}
           />
         ) : activeSection === 'dashboard' ? (
           <Dashboard products={products} salesHistory={salesHistory} />

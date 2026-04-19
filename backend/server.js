@@ -34,30 +34,47 @@ const ejecutarSeed = async () => {
 		}
 
 		console.log("Verificando si la tabla productos ya tiene el seed completo...");
-		const [rows] = await pool.query("SELECT COUNT(*) as total FROM productos");
-		const totalProductos = Number(rows?.[0]?.total || 0);
-
-		if (totalProductos === TOTAL_PRODUCTOS_SEED) {
-			console.log(`Seed omitido: ya existen los ${TOTAL_PRODUCTOS_SEED} productos esperados.`);
-			return;
-		}
-
-		console.log(
-			`Se detectaron ${totalProductos} productos. Ejecutando seed.sql para dejar exactamente ${TOTAL_PRODUCTOS_SEED}.`
+		const [rows] = await pool.query(
+			"SELECT COUNT(*) as total, MIN(id) as minId, MAX(id) as maxId FROM productos"
 		);
-		await pool.query(sql);
+		const totalProductos = Number(rows?.[0]?.total || 0);
+		const minId = Number(rows?.[0]?.minId || 0);
+		const maxId = Number(rows?.[0]?.maxId || 0);
+		const idsCorrectos = minId === 1 && maxId === TOTAL_PRODUCTOS_SEED;
 
-		const [seedRows] = await pool.query("SELECT COUNT(*) as total FROM productos");
-		const totalSembrados = Number(seedRows?.[0]?.total || 0);
-
-		if (totalSembrados !== TOTAL_PRODUCTOS_SEED) {
-			console.warn(
-				`Seed ejecutado, pero se esperaban ${TOTAL_PRODUCTOS_SEED} productos y se encontraron ${totalSembrados}.`
+		if (totalProductos === TOTAL_PRODUCTOS_SEED && idsCorrectos) {
+			console.log(
+				`Seed omitido: ya existen los ${TOTAL_PRODUCTOS_SEED} productos esperados con IDs del 1 al ${TOTAL_PRODUCTOS_SEED}.`
 			);
 			return;
 		}
 
-		console.log(`Seed ejecutado correctamente con ${totalSembrados} productos.`);
+		console.log(
+			`Se detectaron ${totalProductos} productos (IDs ${minId}-${maxId}). Ejecutando seed.sql para dejar exactamente ${TOTAL_PRODUCTOS_SEED} con IDs del 1 al ${TOTAL_PRODUCTOS_SEED}.`
+		);
+		await pool.query(sql);
+
+		const [seedRows] = await pool.query(
+			"SELECT COUNT(*) as total, MIN(id) as minId, MAX(id) as maxId FROM productos"
+		);
+		const totalSembrados = Number(seedRows?.[0]?.total || 0);
+		const minIdSeed = Number(seedRows?.[0]?.minId || 0);
+		const maxIdSeed = Number(seedRows?.[0]?.maxId || 0);
+
+		if (
+			totalSembrados !== TOTAL_PRODUCTOS_SEED ||
+			minIdSeed !== 1 ||
+			maxIdSeed !== TOTAL_PRODUCTOS_SEED
+		) {
+			console.warn(
+				`Seed ejecutado, pero se esperaban ${TOTAL_PRODUCTOS_SEED} productos con IDs del 1 al ${TOTAL_PRODUCTOS_SEED} y se obtuvo total=${totalSembrados}, minId=${minIdSeed}, maxId=${maxIdSeed}.`
+			);
+			return;
+		}
+
+		console.log(
+			`Seed ejecutado correctamente con ${totalSembrados} productos e IDs del 1 al ${TOTAL_PRODUCTOS_SEED}.`
+		);
 	} catch (error) {
 		console.error("Error ejecutando seed.sql:", error.message);
 		throw error;
