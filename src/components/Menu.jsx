@@ -1,4 +1,4 @@
-function Menu({ onNewSale, activeSection, onSectionChange, canManageInventory }) {
+function Menu({ onNewSale, activeSection, onSectionChange, canManageInventory, sessionRoleLabel }) {
   const dashboardActive = activeSection === 'dashboard'
   const salesActive = activeSection === 'ventas'
   const inventoryActive = activeSection === 'inventario'
@@ -53,13 +53,24 @@ function Menu({ onNewSale, activeSection, onSectionChange, canManageInventory })
         </button>
       </div>
 
-      <button
-        className="mt-auto bg-blue-800 text-white rounded-xl h-11 font-semibold hover:bg-blue-900 transition-colors duration-150 shrink-0"
-        onClick={onNewSale}
-      >
-        <i className="fa-solid fa-plus mr-2"></i>
-        Nueva Venta
-      </button>
+      <div className='mt-auto shrink-0 space-y-3'>
+        <div className='rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-cyan-50 px-4 py-3 shadow-[0_6px_18px_rgba(14,116,144,0.12)]'>
+          <p className='text-[10px] uppercase tracking-[0.18em] text-sky-600 font-semibold'>Sesion activa</p>
+          <div className='mt-1 flex items-center gap-2'>
+            <span className='inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-100' aria-hidden='true'></span>
+            <p className='text-sm font-semibold text-slate-800'>{sessionRoleLabel}</p>
+          </div>
+          <p className='text-xs text-slate-500 mt-1'>Cuenta conectada en este terminal.</p>
+        </div>
+
+        <button
+          className="w-full bg-blue-800 text-white rounded-xl h-11 font-semibold hover:bg-blue-900 transition-colors duration-150"
+          onClick={onNewSale}
+        >
+          <i className="fa-solid fa-plus mr-2"></i>
+          Nueva Venta
+        </button>
+      </div>
     </aside>
   )
 }

@@ -377,7 +377,7 @@ function App() {
     return (
       <div className='min-h-screen bg-linear-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4'>
         <div className='w-full max-w-md bg-white border border-blue-300/40 rounded-3xl shadow-[0_24px_70px_rgba(10,27,74,0.45)] p-7'>
-          <p className='text-xs font-semibold tracking-[0.2em] text-blue-900'>POS SYSTEM</p>
+          <p className='text-xs font-semibold tracking-[0.2em] text-blue-900'>GAP SYSTEM</p>
           <h1 className='text-2xl font-semibold text-slate-950 mt-2'>Acceso al sistema</h1>
           <p className='text-sm text-slate-600 mt-1'>Selecciona tu rol e ingresa la clave para continuar.</p>
 
@@ -454,18 +454,12 @@ function App() {
 
   return (
     <div className='bg-slate-200 h-screen flex overflow-hidden'>
-      <div className='absolute top-3 right-4 z-10 flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-950 px-3 py-2 shadow-md'>
-        <span className='inline-flex h-2.5 w-2.5 rounded-full bg-blue-300 ring-2 ring-blue-800' aria-hidden='true'></span>
-        <div className='leading-tight'>
-          <p className='text-[10px] uppercase tracking-wide text-blue-200 font-semibold'>Sesion activa</p>
-          <p className='text-xs font-semibold text-white'>{sessionRoleLabel}</p>
-        </div>
-      </div>
       <Menu
         onNewSale={handleNewSale}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         canManageInventory={canManageInventory}
+        sessionRoleLabel={sessionRoleLabel}
       />
 
       <main className='flex-1 px-6 py-4 border-r border-slate-300 flex flex-col overflow-hidden min-w-0'>
