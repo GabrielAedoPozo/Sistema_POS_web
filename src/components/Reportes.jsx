@@ -1,4 +1,9 @@
 function Reportes({ salesHistory }) {
+  const getLineProfit = (item) => {
+    const costo = Number(item.cost ?? 0)
+    return (Number(item.price) - costo) * Number(item.qty)
+  }
+
   // Análisis por método de pago
   const totalsByMethod = salesHistory.reduce((acc, sale) => {
     if (!acc[sale.paymentMethod]) {
@@ -14,13 +19,18 @@ function Reportes({ salesHistory }) {
   const productAnalysis = salesHistory.reduce((acc, sale) => {
     sale.items.forEach((item) => {
       if (!acc[item.name]) {
-        acc[item.name] = { qty: 0, total: 0, id: item.id }
+        acc[item.name] = { qty: 0, total: 0, profit: 0, id: item.id }
       }
       acc[item.name].qty += item.qty
       acc[item.name].total += item.price * item.qty
+      acc[item.name].profit += getLineProfit(item)
     })
     return acc
   }, {})
+
+  const totalGanancias = salesHistory.reduce((sum, sale) => {
+    return sum + sale.items.reduce((acc, item) => acc + getLineProfit(item), 0)
+  }, 0)
 
   // Obtener producto más vendido
   const topProduct = Object.entries(productAnalysis)
@@ -128,6 +138,13 @@ function Reportes({ salesHistory }) {
         </div>
 
         <div className='bg-white rounded-xl border border-slate-300 p-4'>
+          <p className='text-sm text-slate-500 mb-1'>Ganancia total</p>
+          <p className='text-3xl font-bold text-emerald-700'>
+            {formatMoney(totalGanancias)}
+          </p>
+        </div>
+
+        <div className='bg-white rounded-xl border border-slate-300 p-4'>
           <p className='text-sm text-slate-500 mb-1'>Producto más vendido</p>
           <p className='text-lg font-bold text-slate-900'>
             {topProduct ? topProduct[0] : 'N/A'}
@@ -141,7 +158,7 @@ function Reportes({ salesHistory }) {
 
       {/* Predicciones y Alertas */}
       <div className='grid grid-cols-2 gap-4 shrink-0'>
-        <div className='bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-4'>
+        <div className='bg-linear-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-4'>
           <h3 className='font-semibold text-blue-900 mb-3 flex items-center gap-2'>
             <i className='fa-solid fa-crystal-ball'></i>
             Predicciones para Mañana
@@ -161,7 +178,7 @@ function Reportes({ salesHistory }) {
           </div>
         </div>
 
-        <div className='bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-300 p-4'>
+        <div className='bg-linear-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-300 p-4'>
           <h3 className='font-semibold text-slate-900 mb-3 flex items-center gap-2'>
             <i className='fa-solid fa-chart-line'></i>
             Top Productos
@@ -173,7 +190,9 @@ function Reportes({ salesHistory }) {
               .map(([name, data], idx) => (
                 <div key={idx} className='flex items-center justify-between text-sm bg-white bg-opacity-60 rounded-lg p-2'>
                   <span className='text-slate-700'>{idx + 1}. {name}</span>
-                  <span className='font-semibold text-slate-900'>{data.qty} u.</span>
+                  <span className='font-semibold text-slate-900'>
+                    {data.qty} u. | {formatMoney(data.profit)}
+                  </span>
                 </div>
               ))}
           </div>

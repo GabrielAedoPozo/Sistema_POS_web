@@ -181,7 +181,11 @@ app.use((req, res, next) => {
 
 app.get(["/productos", "/api/productos"], async (req, res) => {
 	try {
-		const [rows] = await pool.query("SELECT * FROM productos");
+		const [rows] = await pool.query(
+			`SELECT id, nombre, precio_compra, precio_venta, precio, stock, created_at
+			 FROM productos
+			 ORDER BY id ASC`
+		);
 		return res.status(200).json(rows);
 	} catch (error) {
 		console.error("Error al obtener productos:", error.message);
@@ -191,17 +195,30 @@ app.get(["/productos", "/api/productos"], async (req, res) => {
 
 app.post(["/productos", "/api/productos"], async (req, res) => {
 	try {
-		const { nombre, precio, stock } = req.body;
+		const { nombre, stock } = req.body;
+		const precioCompra = Number(req.body.precio_compra ?? 0);
+		const precioVenta = Number(req.body.precio_venta ?? req.body.precio);
 
-		if (!nombre || precio === undefined || stock === undefined) {
+		if (
+			!nombre ||
+			stock === undefined ||
+			Number.isNaN(precioCompra) ||
+			Number.isNaN(precioVenta)
+		) {
 			return res
 				.status(400)
-				.json({ error: "nombre, precio y stock son obligatorios" });
+				.json({ error: "nombre, precio_compra, precio_venta y stock son obligatorios" });
+		}
+
+		if (precioCompra < 0 || precioVenta < 0 || Number(stock) < 0) {
+			return res.status(400).json({
+				error: "precio_compra, precio_venta y stock no pueden ser negativos",
+			});
 		}
 
 		const [result] = await pool.query(
-			"INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
-			[nombre, precio, stock]
+			"INSERT INTO productos (nombre, precio_compra, precio_venta, precio, stock) VALUES (?, ?, ?, ?, ?)",
+			[nombre, precioCompra, precioVenta, precioVenta, stock]
 		);
 
 		return res.status(201).json({
@@ -217,17 +234,30 @@ app.post(["/productos", "/api/productos"], async (req, res) => {
 app.put(["/productos/:id", "/api/productos/:id"], async (req, res) => {
 	try {
 		const { id } = req.params;
-		const { nombre, precio, stock } = req.body;
+		const { nombre, stock } = req.body;
+		const precioCompra = Number(req.body.precio_compra ?? 0);
+		const precioVenta = Number(req.body.precio_venta ?? req.body.precio);
 
-		if (!nombre || precio === undefined || stock === undefined) {
+		if (
+			!nombre ||
+			stock === undefined ||
+			Number.isNaN(precioCompra) ||
+			Number.isNaN(precioVenta)
+		) {
 			return res
 				.status(400)
-				.json({ error: "nombre, precio y stock son obligatorios" });
+				.json({ error: "nombre, precio_compra, precio_venta y stock son obligatorios" });
+		}
+
+		if (precioCompra < 0 || precioVenta < 0 || Number(stock) < 0) {
+			return res.status(400).json({
+				error: "precio_compra, precio_venta y stock no pueden ser negativos",
+			});
 		}
 
 		const [result] = await pool.query(
-			"UPDATE productos SET nombre = ?, precio = ?, stock = ? WHERE id = ?",
-			[nombre, precio, stock, id]
+			"UPDATE productos SET nombre = ?, precio_compra = ?, precio_venta = ?, precio = ?, stock = ? WHERE id = ?",
+			[nombre, precioCompra, precioVenta, precioVenta, stock, id]
 		);
 
 		if (result.affectedRows === 0) {
@@ -268,7 +298,9 @@ app.get(["/ventas", "/api/ventas"], async (req, res) => {
 				v.fecha,
 				dv.producto_id,
 				dv.cantidad,
-				dv.precio,
+				dv.precio AS precio_venta,
+				dv.costo_unitario,
+				(dv.precio - dv.costo_unitario) * dv.cantidad AS ganancia_linea,
 				p.nombre AS producto_nombre
 			 FROM ventas v
 			 INNER JOIN detalle_venta dv ON dv.venta_id = v.id
@@ -293,7 +325,9 @@ app.get(["/ventas", "/api/ventas"], async (req, res) => {
 				id: row.producto_id,
 				name: row.producto_nombre,
 				qty: Number(row.cantidad),
-				price: Number(row.precio),
+				price: Number(row.precio_venta),
+				cost: Number(row.costo_unitario),
+				profit: Number(row.ganancia_linea),
 			});
 		}
 
@@ -318,22 +352,23 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 		}
 
 		for (const item of items) {
-			const { producto_id, cantidad, precio } = item;
+			const { producto_id, cantidad } = item;
 
-			if (!producto_id || !cantidad || precio === undefined) {
+			if (!producto_id || !cantidad) {
 				return res.status(400).json({
-					error: "Cada item debe incluir producto_id, cantidad y precio",
+					error: "Cada item debe incluir producto_id y cantidad",
 				});
 			}
 		}
 
 		await connection.beginTransaction();
+		const productosVentaMap = new Map();
 
 		for (const item of items) {
 			const { producto_id, cantidad } = item;
 
 			const [stockRows] = await connection.query(
-				"SELECT stock FROM productos WHERE id = ? FOR UPDATE",
+				"SELECT stock, precio_compra, precio_venta FROM productos WHERE id = ? FOR UPDATE",
 				[producto_id]
 			);
 
@@ -354,21 +389,44 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 				stockError.statusCode = 409;
 				throw stockError;
 			}
+
+			productosVentaMap.set(Number(producto_id), {
+				precio_compra: Number(stockRows[0].precio_compra || 0),
+				precio_venta: Number(stockRows[0].precio_venta || 0),
+			});
+		}
+
+		const totalCalculado = Number(
+			items
+				.reduce((sum, item) => {
+					const producto = productosVentaMap.get(Number(item.producto_id));
+					return sum + Number(item.cantidad) * Number(producto?.precio_venta || 0);
+				}, 0)
+				.toFixed(2)
+		);
+
+		if (Number.isFinite(Number(total)) && Math.abs(Number(total) - totalCalculado) > 0.01) {
+			console.warn(
+				`Total recibido (${total}) no coincide con total calculado (${totalCalculado}). Se usará el calculado.`
+			);
 		}
 
 		const [ventaResult] = await connection.query(
 			"INSERT INTO ventas (total, metodo_pago) VALUES (?, ?)",
-			[total, metodo_pago]
+			[totalCalculado, metodo_pago]
 		);
 
 		const ventaId = ventaResult.insertId;
 
 		for (const item of items) {
-			const { producto_id, cantidad, precio } = item;
+			const { producto_id, cantidad } = item;
+			const producto = productosVentaMap.get(Number(producto_id));
+			const precioVenta = Number(producto?.precio_venta || 0);
+			const costoUnitario = Number(producto?.precio_compra || 0);
 
 			await connection.query(
-				"INSERT INTO detalle_venta (venta_id, producto_id, cantidad, precio) VALUES (?, ?, ?, ?)",
-				[ventaId, producto_id, cantidad, precio]
+				"INSERT INTO detalle_venta (venta_id, producto_id, cantidad, precio, costo_unitario) VALUES (?, ?, ?, ?, ?)",
+				[ventaId, producto_id, cantidad, precioVenta, costoUnitario]
 			);
 
 			await connection.query("UPDATE productos SET stock = stock - ? WHERE id = ?", [cantidad, producto_id]);
@@ -383,7 +441,7 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 		return res.status(201).json({
 			message: "Venta registrada correctamente",
 			ventaId,
-			total,
+			total: totalCalculado,
 			metodo_pago,
 			productos: productosActualizados,
 		});
@@ -660,7 +718,7 @@ const iniciarServidor = async () => {
 			console.log(`Servidor backend corriendo en puerto ${PORT}`);
 		});
 	} catch (error) {
-		console.error("Error al iniciar el servidor:", error.message);
+		console.error("Error al iniciar el servidor:", error);
 		process.exit(1);
 	}
 };

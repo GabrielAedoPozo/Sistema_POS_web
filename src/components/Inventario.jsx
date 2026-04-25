@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 
 function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canManageInventory }) {
   const [draftStocks, setDraftStocks] = useState({})
-  const [draftPrices, setDraftPrices] = useState({})
+  const [draftPurchasePrices, setDraftPurchasePrices] = useState({})
+  const [draftSalePrices, setDraftSalePrices] = useState({})
   const [savingId, setSavingId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -15,13 +16,16 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
 
     setDraftStocks(nextDrafts)
 
-    const nextPriceDrafts = {}
+    const nextPurchasePriceDrafts = {}
+    const nextSalePriceDrafts = {}
 
     for (const product of products) {
-      nextPriceDrafts[product.id] = Number(product.precio).toFixed(2)
+      nextPurchasePriceDrafts[product.id] = Number(product.precio_compra ?? 0).toFixed(2)
+      nextSalePriceDrafts[product.id] = Number(product.precio_venta ?? product.precio ?? 0).toFixed(2)
     }
 
-    setDraftPrices(nextPriceDrafts)
+    setDraftPurchasePrices(nextPurchasePriceDrafts)
+    setDraftSalePrices(nextSalePriceDrafts)
   }, [products])
 
   const handleStockChange = (productId, value) => {
@@ -31,8 +35,15 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
     }))
   }
 
-  const handlePriceChange = (productId, value) => {
-    setDraftPrices((prev) => ({
+  const handlePurchasePriceChange = (productId, value) => {
+    setDraftPurchasePrices((prev) => ({
+      ...prev,
+      [productId]: value,
+    }))
+  }
+
+  const handleSalePriceChange = (productId, value) => {
+    setDraftSalePrices((prev) => ({
       ...prev,
       [productId]: value,
     }))
@@ -42,9 +53,17 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
     if (!canManageInventory) return
 
     const nextStock = Number(draftStocks[product.id])
-    const nextPrice = Number(draftPrices[product.id])
+    const nextPurchasePrice = Number(draftPurchasePrices[product.id])
+    const nextSalePrice = Number(draftSalePrices[product.id])
 
-    if (Number.isNaN(nextStock) || nextStock < 0 || Number.isNaN(nextPrice) || nextPrice < 0) {
+    if (
+      Number.isNaN(nextStock) ||
+      nextStock < 0 ||
+      Number.isNaN(nextPurchasePrice) ||
+      nextPurchasePrice < 0 ||
+      Number.isNaN(nextSalePrice) ||
+      nextSalePrice < 0
+    ) {
       return
     }
 
@@ -53,7 +72,8 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
     try {
       await onUpdateProduct(product, {
         stock: nextStock,
-        precio: Number(nextPrice.toFixed(2)),
+        precio_compra: Number(nextPurchasePrice.toFixed(2)),
+        precio_venta: Number(nextSalePrice.toFixed(2)),
       })
       await onRefresh()
     } finally {
@@ -95,15 +115,16 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
 
       {!canManageInventory && (
         <div className='bg-amber-50 text-amber-800 border border-amber-200 rounded-xl px-4 py-3 text-sm'>
-          Modo solo lectura: solo un admin puede editar precio y stock.
+          Modo solo lectura: solo un admin puede editar precio de compra, precio de venta y stock.
         </div>
       )}
 
       <div className='bg-white rounded-xl border border-slate-300 overflow-hidden flex flex-col flex-1 min-h-0'>
-        <div className='grid grid-cols-[80px_1fr_130px_170px] px-5 py-3 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
+        <div className='grid grid-cols-[70px_1fr_140px_140px_170px] px-5 py-3 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
           <p>ID</p>
           <p>PRODUCTO</p>
-          <p>PRECIO</p>
+          <p>P. COMPRA</p>
+          <p>P. VENTA</p>
           <p>STOCK</p>
         </div>
 
@@ -111,7 +132,7 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
           {filteredProducts.map((product) => (
             <div
               key={product.id}
-              className='grid grid-cols-[80px_1fr_130px_170px] px-5 py-3 border-t border-slate-200 items-center gap-3 hover:bg-slate-50 transition-colors'
+              className='grid grid-cols-[70px_1fr_140px_140px_170px] px-5 py-3 border-t border-slate-200 items-center gap-3 hover:bg-slate-50 transition-colors'
             >
               <p className='text-slate-600 text-sm'>{product.id}</p>
               <p className='text-slate-900 font-medium text-sm'>{product.nombre}</p>
@@ -120,11 +141,22 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
                 type='number'
                 min='0'
                 step='0.01'
-                value={draftPrices[product.id] ?? product.precio}
-                onChange={(event) => handlePriceChange(product.id, event.target.value)}
+                value={draftPurchasePrices[product.id] ?? product.precio_compra ?? 0}
+                onChange={(event) => handlePurchasePriceChange(product.id, event.target.value)}
+                className='w-28 rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed'
+                disabled={!canManageInventory}
+                aria-label={`Precio de compra de ${product.nombre}`}
+              />
+
+              <input
+                type='number'
+                min='0'
+                step='0.01'
+                value={draftSalePrices[product.id] ?? product.precio_venta ?? product.precio ?? 0}
+                onChange={(event) => handleSalePriceChange(product.id, event.target.value)}
                 className='w-24 rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed'
                 disabled={!canManageInventory}
-                aria-label={`Precio de ${product.nombre}`}
+                aria-label={`Precio de venta de ${product.nombre}`}
               />
 
               <div className='flex items-center gap-2'>
@@ -144,7 +176,8 @@ function Inventario({ products, loading, error, onRefresh, onUpdateProduct, canM
                     savingId === product.id ||
                     (
                       Number(draftStocks[product.id]) === Number(product.stock) &&
-                      Number(draftPrices[product.id]) === Number(product.precio)
+                      Number(draftPurchasePrices[product.id]) === Number(product.precio_compra ?? 0) &&
+                      Number(draftSalePrices[product.id]) === Number(product.precio_venta ?? product.precio ?? 0)
                     )
                   }
                 >

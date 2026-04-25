@@ -91,7 +91,8 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: product.nombre,
-        precio: updates.precio,
+        precio_compra: updates.precio_compra,
+        precio_venta: updates.precio_venta,
         stock: updates.stock,
       }),
     })
@@ -167,7 +168,8 @@ function App() {
           id: product.id,
           name: product.nombre,
           type: `Stock: ${product.stock}`,
-          price: Number(product.precio),
+          price: Number(product.precio_venta ?? product.precio),
+          cost: Number(product.precio_compra ?? 0),
           stock: Number(product.stock),
           qty: 1
         }
@@ -311,7 +313,9 @@ function App() {
             id: item.id,
             name: item.name,
             qty: item.qty,
-            price: item.price
+            price: item.price,
+            cost: item.cost,
+            profit: (item.price - item.cost) * item.qty,
           }))
         }
 
@@ -505,9 +509,9 @@ function App() {
 
             <div className='bg-white border border-slate-300 rounded-xl overflow-hidden flex flex-col flex-1 min-h-0'>
               <div className='grid grid-cols-[1fr_90px_110px] px-5 py-2 text-xs text-slate-500 bg-slate-100 font-semibold tracking-wide shrink-0'>
-                <p>PRODUCT NAME</p>
+                <p>NOMBRE DEL PRODUCTO</p>
                 <p>ID</p>
-                <p>PRICE</p>
+                <p>PRECIO</p>
               </div>
 
               <div className='overflow-y-auto flex-1'>
@@ -524,7 +528,7 @@ function App() {
                   </div>
                   <p className='text-blue-800 font-semibold text-sm'>#{product.id}</p>
                   <div className='text-blue-800 font-semibold flex items-center justify-between'>
-                    <span>{formatMoney(Number(product.precio))}</span>
+                    <span>{formatMoney(Number(product.precio_venta ?? product.precio))}</span>
                     <button
                       className='text-blue-800 hover:text-blue-900 disabled:opacity-40'
                       onClick={() => addProductToOrder(product)}

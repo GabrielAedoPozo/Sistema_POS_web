@@ -1,4 +1,9 @@
 function Dashboard({ products, salesHistory }) {
+  const getSaleProfit = (sale) => sale.items.reduce((sum, item) => {
+    const costo = Number(item.cost ?? 0)
+    return sum + (Number(item.price) - costo) * Number(item.qty)
+  }, 0)
+
   // Cálculos KPI
   const calcularKPIs = () => {
     const today = new Date()
@@ -11,13 +16,20 @@ function Dashboard({ products, salesHistory }) {
     })
 
     const ingresoHoy = ventasHoy.reduce((sum, sale) => sum + sale.total, 0)
+    const gananciaHoy = ventasHoy.reduce((sum, sale) => sum + getSaleProfit(sale), 0)
     const totalIngresos = salesHistory.reduce((sum, sale) => sum + sale.total, 0)
-    const valorInventario = products.reduce((sum, p) => sum + (p.precio * p.stock), 0)
+    const totalGanancias = salesHistory.reduce((sum, sale) => sum + getSaleProfit(sale), 0)
+    const valorInventario = products.reduce(
+      (sum, p) => sum + (Number(p.precio_compra ?? 0) * Number(p.stock)),
+      0
+    )
 
     return {
       ventasHoy: ventasHoy.length,
       ingresoHoy,
+      gananciaHoy,
       totalIngresos,
+      totalGanancias,
       totalVentas: salesHistory.length,
       valorInventario,
       productosTotal: products.length,
@@ -161,9 +173,9 @@ function Dashboard({ products, salesHistory }) {
               </div>
 
               <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
-                <p className='text-xs text-slate-600 font-semibold mb-1'>Valor Inventario</p>
-                <p className='text-2xl font-bold text-slate-900'>{formatMoney(kpis.valorInventario)}</p>
-                <p className='text-xs text-slate-600 mt-1'>{kpis.productosTotal} productos</p>
+                <p className='text-xs text-slate-600 font-semibold mb-1'>Ganancia Total</p>
+                <p className='text-2xl font-bold text-emerald-700'>{formatMoney(kpis.totalGanancias)}</p>
+                <p className='text-xs text-slate-600 mt-1'>Ganancia hoy: {formatMoney(kpis.gananciaHoy)}</p>
               </div>
 
               <div className='bg-slate-50 rounded-xl border border-slate-200 p-4'>
@@ -171,6 +183,9 @@ function Dashboard({ products, salesHistory }) {
                 <p className='text-2xl font-bold text-slate-900'>{stock.bajo.length}</p>
                 <p className='text-xs text-slate-600 mt-1'>productos críticos</p>
               </div>
+            </div>
+            <div className='mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700'>
+              Valor de inventario (a costo): <span className='font-semibold'>{formatMoney(kpis.valorInventario)}</span> en {kpis.productosTotal} productos.
             </div>
           </div>
 
