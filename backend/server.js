@@ -3,7 +3,9 @@ import express from "express";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
+import http from "http";
 import { fileURLToPath } from "url";
+import { Server as SocketIOServer } from "socket.io";
 import pool, { initDB } from "./db.js";
 import { emitirBoleta, emitirFactura } from "./apisunat.js";
 
@@ -15,7 +17,13 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
 
 const PORT = process.env.PORT || 3000;
-const TOTAL_PRODUCTOS_SEED = 158;
+const TOTAL_PRODUCTOS_SEED = 166;
+const httpServer = http.createServer(app);
+const io = new SocketIOServer(httpServer, {
+	cors: {
+		origin: "*",
+	},
+});
 
 const ejecutarSeed = async () => {
 	try {
@@ -103,6 +111,136 @@ const crearTablaComprobantes = async () => {
             CONSTRAINT fk_comprobante_venta FOREIGN KEY (venta_id) REFERENCES ventas(id)
         )`
     );
+};
+
+const crearTablasComandas = async () => {
+	await pool.query(
+		`CREATE TABLE IF NOT EXISTS comandas (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			venta_id INT NOT NULL,
+			fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			estado ENUM('pendiente', 'listo') NOT NULL DEFAULT 'pendiente',
+			detalle_comanda TEXT NULL,
+			fecha_completado DATETIME NULL,
+			UNIQUE KEY uq_comanda_venta (venta_id),
+			INDEX idx_comanda_estado_fecha (estado, fecha_hora),
+			CONSTRAINT fk_comanda_venta FOREIGN KEY (venta_id) REFERENCES ventas(id)
+		)`
+	);
+
+	await pool.query(
+		`CREATE TABLE IF NOT EXISTS comanda_items (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			comanda_id INT NOT NULL,
+			producto_id INT NOT NULL,
+			cantidad INT NOT NULL,
+			nota_item VARCHAR(255) NULL,
+			INDEX idx_comanda_items_comanda (comanda_id),
+			CONSTRAINT fk_comanda_items_comanda FOREIGN KEY (comanda_id) REFERENCES comandas(id),
+			CONSTRAINT fk_comanda_items_producto FOREIGN KEY (producto_id) REFERENCES productos(id)
+		)`
+	);
+};
+
+const mapearComandasDesdeRows = (rows = []) => {
+	const comandasMap = new Map();
+
+	for (const row of rows) {
+		if (!comandasMap.has(row.comanda_id)) {
+			comandasMap.set(row.comanda_id, {
+				id: Number(row.comanda_id),
+				venta_id: Number(row.venta_id),
+				fecha_hora: row.fecha_hora,
+				estado: row.estado,
+				detalle_comanda: row.detalle_comanda || "",
+				fecha_completado: row.fecha_completado,
+				metodo_pago: row.metodo_pago,
+				total: Number(row.total || 0),
+				items: [],
+			});
+		}
+
+		if (row.comanda_item_id) {
+			comandasMap.get(row.comanda_id).items.push({
+				id: Number(row.comanda_item_id),
+				producto_id: Number(row.producto_id),
+				producto_nombre: row.producto_nombre,
+				cantidad: Number(row.cantidad),
+				nota_item: row.nota_item || "",
+			});
+		}
+	}
+
+	return Array.from(comandasMap.values());
+};
+
+const obtenerComandas = async (estado = "pendiente") => {
+	const estadoNormalizado = ["pendiente", "listo", "todos"].includes(estado)
+		? estado
+		: "pendiente";
+
+	let whereClause = "";
+	const params = [];
+
+	if (estadoNormalizado !== "todos") {
+		whereClause = "WHERE c.estado = ?";
+		params.push(estadoNormalizado);
+	}
+
+	const [rows] = await pool.query(
+		`SELECT
+			c.id AS comanda_id,
+			c.venta_id,
+			c.fecha_hora,
+			c.estado,
+			c.detalle_comanda,
+			c.fecha_completado,
+			v.metodo_pago,
+			v.total,
+			ci.id AS comanda_item_id,
+			ci.producto_id,
+			ci.cantidad,
+			ci.nota_item,
+			p.nombre AS producto_nombre
+		 FROM comandas c
+		 INNER JOIN ventas v ON v.id = c.venta_id
+		 LEFT JOIN comanda_items ci ON ci.comanda_id = c.id
+		 LEFT JOIN productos p ON p.id = ci.producto_id
+		 ${whereClause}
+		 ORDER BY c.fecha_hora ASC, c.id ASC, ci.id ASC`,
+		params
+	);
+
+	return mapearComandasDesdeRows(rows);
+};
+
+const obtenerComandaPorId = async (comandaId) => {
+	const [rows] = await pool.query(
+		`SELECT
+			c.id AS comanda_id,
+			c.venta_id,
+			c.fecha_hora,
+			c.estado,
+			c.detalle_comanda,
+			c.fecha_completado,
+			v.metodo_pago,
+			v.total,
+			ci.id AS comanda_item_id,
+			ci.producto_id,
+			ci.cantidad,
+			ci.nota_item,
+			p.nombre AS producto_nombre
+		 FROM comandas c
+		 INNER JOIN ventas v ON v.id = c.venta_id
+		 LEFT JOIN comanda_items ci ON ci.comanda_id = c.id
+		 LEFT JOIN productos p ON p.id = ci.producto_id
+		 WHERE c.id = ?
+		 ORDER BY c.fecha_hora ASC, c.id ASC, ci.id ASC`,
+		[comandaId]
+	);
+
+	const comandas = mapearComandasDesdeRows(rows);
+	return comandas[0] || null;
 };
 
 const redondear2 = (valor) => Number(Number(valor).toFixed(2));
@@ -344,6 +482,7 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 	try {
 		connection = await pool.getConnection();
 		const { total, metodo_pago, items } = req.body;
+		const detalleComanda = String(req.body.detalle_comanda || "").trim();
 
 		if (total === undefined || !metodo_pago || !Array.isArray(items) || items.length === 0) {
 			return res
@@ -432,7 +571,26 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 			await connection.query("UPDATE productos SET stock = stock - ? WHERE id = ?", [cantidad, producto_id]);
 		}
 
+		const [comandaResult] = await connection.query(
+			"INSERT INTO comandas (venta_id, detalle_comanda, estado) VALUES (?, ?, 'pendiente')",
+			[ventaId, detalleComanda || null]
+		);
+
+		const comandaId = comandaResult.insertId;
+
+		for (const item of items) {
+			await connection.query(
+				"INSERT INTO comanda_items (comanda_id, producto_id, cantidad, nota_item) VALUES (?, ?, ?, ?)",
+				[comandaId, item.producto_id, item.cantidad, item.nota_item || null]
+			);
+		}
+
 		await connection.commit();
+
+		const nuevaComanda = await obtenerComandaPorId(comandaId);
+		if (nuevaComanda) {
+			io.emit("nueva_comanda", nuevaComanda);
+		}
 
 		const [productosActualizados] = await connection.query(
 			"SELECT * FROM productos"
@@ -441,6 +599,7 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 		return res.status(201).json({
 			message: "Venta registrada correctamente",
 			ventaId,
+			comandaId,
 			total: totalCalculado,
 			metodo_pago,
 			productos: productosActualizados,
@@ -457,6 +616,67 @@ app.post(["/ventas", "/api/ventas"], async (req, res) => {
 		if (connection) {
 			connection.release();
 		}
+	}
+});
+
+app.get(["/comandas", "/api/comandas"], async (req, res) => {
+	try {
+		const estado = String(req.query.estado || "pendiente").toLowerCase();
+		const comandas = await obtenerComandas(estado);
+		return res.status(200).json(comandas);
+	} catch (error) {
+		console.error("Error al obtener comandas:", error.message);
+		return res.status(500).json({ error: "Error al obtener comandas" });
+	}
+});
+
+app.get(["/comandas/pendientes", "/api/comandas/pendientes"], async (req, res) => {
+	try {
+		const comandas = await obtenerComandas("pendiente");
+		return res.status(200).json(comandas);
+	} catch (error) {
+		console.error("Error al obtener comandas pendientes:", error.message);
+		return res.status(500).json({ error: "Error al obtener comandas pendientes" });
+	}
+});
+
+app.patch(["/comandas/:id/listo", "/api/comandas/:id/listo"], async (req, res) => {
+	try {
+		const { id } = req.params;
+		const [result] = await pool.query(
+			"UPDATE comandas SET estado = 'listo', fecha_completado = NOW() WHERE id = ? AND estado = 'pendiente'",
+			[id]
+		);
+
+		if (result.affectedRows === 0) {
+			const comanda = await obtenerComandaPorId(id);
+			if (!comanda) {
+				return res.status(404).json({ error: "Comanda no encontrada" });
+			}
+
+			if (comanda.estado === "listo") {
+				return res.status(200).json({
+					message: "La comanda ya estaba marcada como lista",
+					comanda,
+				});
+			}
+
+			return res.status(409).json({ error: "No se pudo actualizar la comanda" });
+		}
+
+		const comandaActualizada = await obtenerComandaPorId(id);
+		io.emit("comanda_lista", {
+			comandaId: Number(id),
+			comanda: comandaActualizada,
+		});
+
+		return res.status(200).json({
+			message: "Comanda marcada como lista",
+			comanda: comandaActualizada,
+		});
+	} catch (error) {
+		console.error("Error al marcar comanda como lista:", error.message);
+		return res.status(500).json({ error: "Error al marcar comanda como lista" });
 	}
 });
 
@@ -713,8 +933,13 @@ const iniciarServidor = async () => {
 	try {
 		await initDB();
 		await crearTablaComprobantes();
+		await crearTablasComandas();
 		await ejecutarSeed();
-		app.listen(PORT, "0.0.0.0", () => {
+		io.on("connection", (socket) => {
+			console.log(`Socket conectado: ${socket.id}`);
+		});
+
+		httpServer.listen(PORT, "0.0.0.0", () => {
 			console.log(`Servidor backend corriendo en puerto ${PORT}`);
 		});
 	} catch (error) {

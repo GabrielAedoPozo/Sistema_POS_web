@@ -5,12 +5,15 @@ import Orden from './components/Orden.jsx'
 import Reportes from './components/Reportes.jsx'
 import Inventario from './components/Inventario.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import ComandaView from './components/ComandaView.jsx'
 import { apiFetch } from './api.js'
 import './styles/style.css'
 import '@fontsource/onest/300.css';
 import '@fontsource/onest/400.css';
 import '@fontsource/onest/500.css';
 import '@fontsource/onest/600.css';
+
+const SESSION_ROLE_KEY = 'pos_system_role'
 
 const normalizarMensajeError = (error, fallback) => {
   const msg = String(error?.message || '').toLowerCase()
@@ -26,6 +29,7 @@ function App() {
   const CLAVES_POR_ROL = {
     admin: '34',
     usuario: '12',
+    comanda: '56',
   }
 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -43,9 +47,21 @@ function App() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [customerDocument, setCustomerDocument] = useState('')
   const [customerName, setCustomerName] = useState('')
+  const [comandaDetail, setComandaDetail] = useState('')
   const [activeSection, setActiveSection] = useState('ventas')
   const [salesHistory, setSalesHistory] = useState([])
   const canManageInventory = currentRole === 'admin'
+
+  useEffect(() => {
+    const savedRole = localStorage.getItem(SESSION_ROLE_KEY)
+    const rolesValidos = new Set(['admin', 'usuario', 'comanda'])
+
+    if (!savedRole || !rolesValidos.has(savedRole)) return
+
+    setSelectedRole(savedRole)
+    setCurrentRole(savedRole)
+    setIsAuthenticated(true)
+  }, [])
 
   const fetchProducts = async () => {
     setLoadingProducts(true)
@@ -105,11 +121,11 @@ function App() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || currentRole === 'comanda') return
 
     fetchProducts()
     fetchSalesHistory()
-  }, [isAuthenticated])
+  }, [isAuthenticated, currentRole])
 
   const handleAccessSubmit = (event) => {
     event.preventDefault()
@@ -123,6 +139,7 @@ function App() {
 
     setCurrentRole(selectedRole)
     setIsAuthenticated(true)
+    localStorage.setItem(SESSION_ROLE_KEY, selectedRole)
     setAccessError('')
     setAccessKey('')
   }
@@ -198,6 +215,7 @@ function App() {
     setOrderItems([])
     setCustomerDocument('')
     setCustomerName('')
+    setComandaDetail('')
   }
 
   const handleNewSale = () => {
@@ -205,6 +223,7 @@ function App() {
     setPaymentMethod('')
     setCustomerDocument('')
     setCustomerName('')
+    setComandaDetail('')
     setComprobanteMessage({ type: '', text: '' })
     setSearch('')
     setActiveSection('ventas')
@@ -283,6 +302,7 @@ function App() {
         const payload = {
           total,
           metodo_pago: paymentMethod,
+          detalle_comanda: comandaDetail.trim(),
           items: orderItems.map((item) => ({
             producto_id: item.id,
             cantidad: item.qty,
@@ -360,6 +380,7 @@ function App() {
         setPaymentMethod('')
         setCustomerDocument('')
         setCustomerName('')
+        setComandaDetail('')
         await fetchSalesHistory()
       } catch (error) {
         setComprobanteMessage({
@@ -375,7 +396,15 @@ function App() {
 
   const formatMoney = (amount) => `S/ ${amount.toFixed(2)}`
   const showOrderPanel = activeSection === 'ventas'
-  const sessionRoleLabel = currentRole === 'admin' ? 'Administrador' : 'Usuario'
+  const sessionRoleLabel = currentRole === 'admin'
+    ? 'Administrador'
+    : currentRole === 'comanda'
+      ? 'Comanda'
+      : 'Usuario'
+
+  if (isAuthenticated && currentRole === 'comanda') {
+    return <ComandaView />
+  }
 
   if (!isAuthenticated) {
     return (
@@ -388,7 +417,7 @@ function App() {
           <form onSubmit={handleAccessSubmit} className='mt-6 space-y-4'>
             <div>
               <p className='text-sm font-medium text-blue-900 mb-2'>Rol</p>
-              <div className='grid grid-cols-2 gap-2'>
+              <div className='grid grid-cols-3 gap-2'>
                 <button
                   type='button'
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
@@ -416,6 +445,20 @@ function App() {
                   }}
                 >
                   Usuario
+                </button>
+                <button
+                  type='button'
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                    selectedRole === 'comanda'
+                      ? 'bg-blue-900 text-white border-blue-900 shadow-sm'
+                      : 'bg-white text-blue-900 border-blue-300 hover:bg-blue-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedRole('comanda')
+                    setAccessError('')
+                  }}
+                >
+                  Comanda
                 </button>
               </div>
             </div>
@@ -580,9 +623,11 @@ function App() {
           paymentMethod={paymentMethod}
           customerDocument={customerDocument}
           customerName={customerName}
+          comandaDetail={comandaDetail}
           onPaymentSelect={setPaymentMethod}
           onCustomerDocumentChange={setCustomerDocument}
           onCustomerNameChange={setCustomerName}
+          onComandaDetailChange={setComandaDetail}
           onUpdateQty={updateQty}
           onClearOrder={clearOrder}
           onCheckout={handleCheckout}

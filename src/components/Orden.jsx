@@ -9,9 +9,11 @@ function Orden({
     paymentMethod,
     customerDocument,
     customerName,
+    comandaDetail,
     onPaymentSelect,
     onCustomerDocumentChange,
     onCustomerNameChange,
+    onComandaDetailChange,
     onUpdateQty,
     onClearOrder,
     onCheckout,
@@ -152,6 +154,13 @@ function Orden({
                         placeholder="Nombre / Razón social (se llena automáticamente)"
                         value={customerName}
                         onChange={(event) => onCustomerNameChange(event.target.value)}
+                        disabled={disabled}
+                    />
+                    <textarea
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 min-h-20 resize-none"
+                        placeholder="Detalle de comanda (ej: con kétchup, sin mayonesa)"
+                        value={comandaDetail}
+                        onChange={(event) => onComandaDetailChange(event.target.value)}
                         disabled={disabled}
                     />
                 </div>
