@@ -1,8 +1,8 @@
--- Limpiar tabla (opcional)
-DELETE FROM productos;
-ALTER TABLE productos AUTO_INCREMENT = 1;
+-- Asegurar que la columna nombre tenga índice único (ignora error si ya existe)
+ALTER TABLE productos ADD UNIQUE KEY uk_productos_nombre (nombre);
 
-INSERT INTO productos (nombre, precio_compra, precio_venta, precio, stock) VALUES
+-- Insertar productos sin borrar los existentes (respeta foreign keys de detalle_venta)
+INSERT IGNORE INTO productos (nombre, precio_compra, precio_venta, precio, stock) VALUES
 ('ADICIONAL HAMB CARNE', 0.00, 3.50, 3.50, 50),
 ('ADICIONAL HAMB LENTEJA', 0.00, 3.00, 3.00, 50),
 ('ADICIONAL POLLO ANTICUCHERO', 0.00, 3.50, 3.50, 50),
